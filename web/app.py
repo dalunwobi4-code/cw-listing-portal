@@ -34,16 +34,19 @@ from agents.poster_airtable    import post_property as post_airtable
 
 # ── Credentials: env vars (Railway) with fallback to local orchestrate.py ───
 def _get_credentials():
-    airtable_token = os.environ.get("AIRTABLE_TOKEN")
-    if airtable_token:
+    if os.environ.get("AIRTABLE_TOKEN"):
         return {
-            "ppng":        {"email": os.environ["PPNG_EMAIL"],        "password": os.environ["PPNG_PASSWORD"]},
-            "propertypro": {"email": os.environ["PROPERTYPRO_EMAIL"], "password": os.environ["PROPERTYPRO_PASSWORD"]},
-            "npc":         {"email": os.environ["NPC_EMAIL"],         "password": os.environ["NPC_PASSWORD"]},
-            "airtable":    {"token": airtable_token},
+            "ppng":        {"email": os.environ.get("PPNG_EMAIL", ""),        "password": os.environ.get("PPNG_PASSWORD", "")},
+            "propertypro": {"email": os.environ.get("PROPERTYPRO_EMAIL", ""), "password": os.environ.get("PROPERTYPRO_PASSWORD", "")},
+            "npc":         {"email": os.environ.get("NPC_EMAIL", ""),         "password": os.environ.get("NPC_PASSWORD", "")},
+            "airtable":    {"token": os.environ.get("AIRTABLE_TOKEN", "")},
         }
-    from orchestrate import CREDENTIALS as _C
-    return _C
+    try:
+        from orchestrate import CREDENTIALS as _C
+        return _C
+    except ImportError:
+        # No credentials found — app will start but posting will fail
+        return {"ppng": {}, "propertypro": {}, "npc": {}, "airtable": {}}
 
 CREDENTIALS = _get_credentials()
 
