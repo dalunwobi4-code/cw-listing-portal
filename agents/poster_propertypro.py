@@ -72,17 +72,25 @@ def make_session(proxy_url: str = ""):
 
 
 def login(session, email, password):
-    # GET login page first to establish cookies, then POST credentials
-    session.get(f"{BASE_URL}/login", allow_redirects=True)
-    r = session.post(f"{BASE_URL}/login", data={
+    # GET login page first to grab CSRF token and establish cookies
+    r0 = session.get(f"{BASE_URL}/login", allow_redirects=True)
+    # Try to extract CSRF token (PropertyPro may require it on POST)
+    csrf_m = (re.search(r'name=["\']_token["\'][^>]+value=["\']([^"\']+)["\']', r0.text) or
+              re.search(r'name=["\']csrfToken["\'][^>]+value=["\']([^"\']+)["\']', r0.text) or
+              re.search(r'<meta[^>]+name=["\']csrf-token["\'][^>]+content=["\']([^"\']+)["\']', r0.text))
+    data = {
         "email": email,
         "password": password,
         "keepAlive": "on",
         "lastUrl": ""
-    }, allow_redirects=True)
+    }
+    if csrf_m:
+        data["_token"] = csrf_m.group(1)
+    r = session.post(f"{BASE_URL}/login", data=data, allow_redirects=True)
     if "dashboard" in r.url or "profile" in r.url:
         return True
-    raise Exception(f"PropertyPro login failed: {r.url}")
+    snippet = r.text[:300].replace("\n", " ")
+    raise Exception(f"PropertyPro login failed: {r.url} | Page: {snippet}")
 
 
 def create_listing(session, prop: dict) -> tuple:
