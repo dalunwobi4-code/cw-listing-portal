@@ -68,7 +68,11 @@ def make_session():
 
 def login(session, email, password):
     r = session.get(f"{BASE_URL}/login")
-    csrf = re.search(r'name="_token" value="([^"]+)"', r.text).group(1)
+    m = re.search(r'name="_token" value="([^"]+)"', r.text)
+    if not m:
+        snippet = r.text[:400].replace("\n", " ")
+        raise Exception(f"NPC: login page missing _token (geo-block?). Status {r.status_code}. Page: {snippet}")
+    csrf = m.group(1)
     r2 = session.post(f"{BASE_URL}/login", data={
         "_token": csrf,
         "email": email,
@@ -82,7 +86,11 @@ def login(session, email, password):
 def create_listing(session, prop: dict) -> tuple:
     """Create listing. Returns (listing_id, images_url)."""
     r = session.get(f"{BASE_URL}/account/listings/create")
-    token = re.search(r'name="_token"\s+value="([^"]+)"', r.text).group(1)
+    m = re.search(r'name="_token"\s+value="([^"]+)"', r.text)
+    if not m:
+        snippet = r.text[:400].replace("\n", " ")
+        raise Exception(f"NPC: listings/create page missing _token (session expired?). Status {r.status_code}. Page: {snippet}")
+    token = m.group(1)
     agent_id = re.search(r'name="agent_id"[^>]*value="([^"]+)"', r.text)
     agent_name = re.search(r'name="agent"[^>]*value="([^"]+)"', r.text)
 

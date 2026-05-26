@@ -66,7 +66,11 @@ def make_session():
 
 def login(session, email, password):
     r = session.get(f"{BASE_URL}/login")
-    csrf = re.search(r'name="csrfToken" value="([^"]+)"', r.text).group(1)
+    m = re.search(r'name="csrfToken" value="([^"]+)"', r.text)
+    if not m:
+        snippet = r.text[:400].replace("\n", " ")
+        raise Exception(f"PP Nigeria: login page missing CSRF token (geo-block?). Status {r.status_code}. Page: {snippet}")
+    csrf = m.group(1)
     r2 = session.post(f"{BASE_URL}/login", data={
         "csrfToken": csrf,
         "email": email,
@@ -80,7 +84,11 @@ def login(session, email, password):
 def create_listing(session, prop: dict) -> str:
     """Create the property listing. Returns property_id."""
     r = session.get(f"{BASE_URL}/property-post")
-    csrf = re.search(r'name="csrfToken" value="([^"]+)"', r.text).group(1)
+    m = re.search(r'name="csrfToken" value="([^"]+)"', r.text)
+    if not m:
+        snippet = r.text[:400].replace("\n", " ")
+        raise Exception(f"PP Nigeria: property-post page missing CSRF (not logged in?). Status {r.status_code}. Page: {snippet}")
+    csrf = m.group(1)
 
     location = AREA_CODES.get(prop.get("location", "Lekki Phase 1"),
                                AREA_CODES["Lekki Phase 1"])
@@ -161,7 +169,10 @@ def upload_images(session, property_id: str, image_paths: list, title: str) -> i
 
     # SAVE — must use same session
     r2 = session.get(f"{BASE_URL}/property-pictures/{property_id}")
-    save_csrf = re.search(r'name="csrfToken" value="([^"]+)"', r2.text).group(1)
+    save_m = re.search(r'name="csrfToken" value="([^"]+)"', r2.text)
+    if not save_m:
+        return uploaded  # images already uploaded, skip save step
+    save_csrf = save_m.group(1)
     session.post(
         f"{BASE_URL}/property-pictures/{property_id}",
         data={"csrfToken": save_csrf, "uuid": uuid},
