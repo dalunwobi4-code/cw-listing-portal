@@ -65,7 +65,7 @@ PLATFORM_LABELS = {
 
 AIRTABLE_BASE_ID = "appui0GIVsqalToEa"
 AIRTABLE_TABLE   = "Lagos Properties"
-AIRTABLE_TOKEN   = CREDENTIALS["airtable"]["token"]
+AIRTABLE_TOKEN   = CREDENTIALS.get("airtable", {}).get("token", "")
 
 app   = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
