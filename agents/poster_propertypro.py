@@ -19,6 +19,7 @@ NOTE: Multi-image upload — only 1 image persists after save (known PropertyPro
 
 import requests, re, os, time, threading
 import urllib3
+import cloudscraper
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -60,18 +61,16 @@ FEATURE_CODES = {
 
 
 def make_session():
-    s = requests.Session()
-    s.headers["User-Agent"] = (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    # cloudscraper mimics Chrome TLS fingerprint — bypasses Cloudflare on Railway's IP
+    # NOTE: No retry adapter — PropertyPro returns 400 on property creation with retries
+    return cloudscraper.create_scraper(
+        browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
-    s.verify = False
-    # NOTE: Do NOT use urllib3 Retry adapter here — it causes PropertyPro to return 400
-    # on property creation (the retry mechanism interferes with form POST handling).
-    return s
 
 
 def login(session, email, password):
+    # GET login page first to establish cookies, then POST credentials
+    session.get(f"{BASE_URL}/login", allow_redirects=True)
     r = session.post(f"{BASE_URL}/login", data={
         "email": email,
         "password": password,

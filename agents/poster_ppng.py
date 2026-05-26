@@ -52,11 +52,9 @@ FEATURE_CODES = {
 
 
 def make_session():
-    s = cloudscraper.create_scraper(
+    return cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
-    s.verify = False
-    return s
 
 
 def login(session, email, password):
