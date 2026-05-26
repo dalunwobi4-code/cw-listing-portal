@@ -50,6 +50,13 @@ def _get_credentials():
 
 CREDENTIALS = _get_credentials()
 
+# Optional residential proxy — routes requests to Cloudflare-protected sites
+# Set PROXY_URL=http://user:pass@host:port in Railway env vars (WebShare free tier works)
+_PROXY_URL = os.environ.get("PROXY_URL", "")
+if _PROXY_URL:
+    for _p in ("ppng", "propertypro", "npc"):
+        CREDENTIALS.setdefault(_p, {})["proxy_url"] = _PROXY_URL
+
 import requests as req
 
 PLATFORM_POSTERS = {

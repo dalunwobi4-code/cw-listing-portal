@@ -53,10 +53,13 @@ MODE_MAP = {
 }
 
 
-def make_session():
-    return cloudscraper.create_scraper(
+def make_session(proxy_url: str = ""):
+    s = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
+    if proxy_url:
+        s.proxies = {"http": proxy_url, "https": proxy_url}
+    return s
 
 
 def login(session, email, password):
@@ -219,7 +222,8 @@ def get_public_url(session, listing_id: str) -> str:
 def post_property(prop: dict, image_paths: list, credentials: dict) -> dict:
     """Full flow: login → create → upload images → return result."""
     result = {"ref": prop.get("ref", ""), "platform": "npc", "success": False}
-    session = make_session()
+    proxy_url = credentials.get("proxy_url", "")
+    session = make_session(proxy_url)
 
     try:
         login(session, credentials["email"], credentials["password"])

@@ -60,12 +60,15 @@ FEATURE_CODES = {
 }
 
 
-def make_session():
+def make_session(proxy_url: str = ""):
     # cloudscraper mimics Chrome TLS fingerprint — bypasses Cloudflare on Railway's IP
     # NOTE: No retry adapter — PropertyPro returns 400 on property creation with retries
-    return cloudscraper.create_scraper(
+    s = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
+    if proxy_url:
+        s.proxies = {"http": proxy_url, "https": proxy_url}
+    return s
 
 
 def login(session, email, password):
@@ -185,7 +188,7 @@ def _get_session(credentials: dict, force_new: bool = False) -> requests.Session
     """Return a shared logged-in session (login once, reuse for all properties)."""
     global _shared_session, _shared_credentials
     if force_new or _shared_session is None or _shared_credentials != credentials.get("email"):
-        _shared_session = make_session()
+        _shared_session = make_session(credentials.get("proxy_url", ""))
         login(_shared_session, credentials["email"], credentials["password"])
         _shared_credentials = credentials.get("email")
     return _shared_session

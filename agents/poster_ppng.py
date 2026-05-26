@@ -51,10 +51,13 @@ FEATURE_CODES = {
 }
 
 
-def make_session():
-    return cloudscraper.create_scraper(
+def make_session(proxy_url: str = ""):
+    s = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
+    if proxy_url:
+        s.proxies = {"http": proxy_url, "https": proxy_url}
+    return s
 
 
 def login(session, email, password):
@@ -201,11 +204,12 @@ def post_property(prop: dict, image_paths: list, credentials: dict) -> dict:
     """
     result = {"ref": prop.get("ref", ""), "platform": "ppng", "success": False}
     count = 0
+    proxy_url = credentials.get("proxy_url", "")
 
     try:
         # Stagger logins — PP Nigeria rejects concurrent logins from same account
         with _login_lock:
-            session = make_session()
+            session = make_session(proxy_url)
             login(session, credentials["email"], credentials["password"])
             property_id = create_listing(session, prop)
             time.sleep(1)  # release lock after listing is created
