@@ -1,0 +1,35 @@
+# Credentials — NEVER commit these
+orchestrate.py
+*.env
+.env*
+
+# Generated image folders
+web/uploads/
+watermarked/
+enhanced/
+raw_images/
+
+# Logs and run data
+logs/
+data/live_test.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Mac
+.DS_Store
+*.DS_Store
+
+# Logs
+*.log
+web/portal.log
+
+# Watermark logo (local file)
+!web/static/cw_logo.png

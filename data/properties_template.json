@@ -1,0 +1,44 @@
+[
+  {
+    "ref": "CW08494",
+    "title": "1-2 Bedroom Apartments For Sale in Lekki Phase 1",
+    "mode": "sale",
+    "property_type": "Flat",
+    "location": "Lekki Phase 1",
+    "bedrooms": 2,
+    "bathrooms": 2,
+    "toilets": 2,
+    "price": 180000000,
+    "street": "",
+    "description": "CW08494\n\n1-2 Bedroom Apartments For Sale in Lekki Phase 1\n\nBeautifully finished 1-2 bedroom apartments for sale in the heart of Lekki Phase 1. These contemporary apartments offer modern finishes, spacious interiors, and excellent facilities.\n\nFeatures:\n- All rooms ensuite\n- 24-hour security\n- Generator backup\n- Serene environment",
+    "features": ["All Room Ensuite", "24 Hours Security", "Generator"]
+  },
+  {
+    "ref": "CW08495",
+    "title": "3 Bedroom Flat For Sale in Lekki Phase 1",
+    "mode": "sale",
+    "property_type": "Flat",
+    "location": "Lekki Phase 1",
+    "bedrooms": 3,
+    "bathrooms": 3,
+    "toilets": 3,
+    "price": 250000000,
+    "street": "",
+    "description": "CW08495\n\n3 Bedroom Flat For Sale in Lekki Phase 1\n\nSpacious and well-finished 3 bedroom flat located in a prime location in Lekki Phase 1. Ideal for families and professionals.\n\nFeatures:\n- All rooms ensuite\n- Swimming pool\n- 24-hour security\n- Generator backup\n- Boys quarter",
+    "features": ["All Room Ensuite", "Swimming Pool", "24 Hours Security", "Generator", "Boys Quarter"]
+  },
+  {
+    "ref": "CW08496",
+    "title": "4 Bedroom Terrace Duplex For Sale in Lekki Phase 1",
+    "mode": "sale",
+    "property_type": "Semi-detached Duplex",
+    "location": "Lekki Phase 1",
+    "bedrooms": 4,
+    "bathrooms": 4,
+    "toilets": 5,
+    "price": 350000000,
+    "street": "",
+    "description": "CW08496\n\n4 Bedroom Terrace Duplex For Sale in Lekki Phase 1\n\nExquisitely designed 4 bedroom terrace duplex in a prestigious estate in Lekki Phase 1. Premium finishes throughout with excellent amenities.\n\nFeatures:\n- All rooms ensuite\n- Swimming pool\n- 24-hour security\n- Boys quarter\n- CCTV\n- Elevator",
+    "features": ["All Room Ensuite", "Swimming Pool", "24 Hours Security", "Boys Quarter", "CCTV"]
+  }
+]

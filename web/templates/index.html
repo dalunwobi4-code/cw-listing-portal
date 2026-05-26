@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CW Lagos — Listing Portal</title>
+<style>
+:root {
+  --bg: #0d0d0d; --card: #161616; --border: #2a2a2a;
+  --accent: #f5c518; --purple: #7c5cfc;
+  --text: #f0f0f0; --muted: #777;
+  --green: #22c55e; --red: #ef4444;
+  --r: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+
+/* layout */
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 60px; }
+
+/* header */
+header { display: flex; align-items: center; gap: 14px; padding: 20px 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+.logo { width: 38px; height: 38px; background: var(--accent); border-radius: 9px; display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #000; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 700; }
+header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* two-col */
+.cols { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 780px) { .cols { grid-template-columns: 1fr; } }
+
+/* card */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 22px; }
+.card + .card { margin-top: 16px; }
+.card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
+
+/* textarea */
+textarea {
+  width: 100%; padding: 14px; background: #111; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit;
+  resize: none; outline: none; line-height: 1.6; transition: border-color .15s;
+  min-height: 200px;
+}
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--muted); }
+
+/* parse button */
+.parse-btn {
+  margin-top: 10px; width: 100%; padding: 11px; background: var(--purple);
+  color: #fff; border: none; border-radius: 8px; font-size: 13px;
+  font-weight: 700; cursor: pointer; transition: opacity .15s;
+}
+.parse-btn:hover { opacity: .85; }
+.parse-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* parsed preview */
+#parsed-preview { display: none; margin-top: 16px; }
+.preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.pf { font-size: 12px; }
+.pf .pf-label { color: var(--muted); margin-bottom: 2px; }
+.pf .pf-val { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf.full { grid-column: 1/-1; }
+.pf .pf-val.title-val { white-space: normal; }
+.pf .pf-val.desc-val { white-space: normal; line-height: 1.6; color: #ccc; font-weight: 400; font-size: 12px; margin-top: 4px; }
+.chip-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.chip { background: #1e1e1e; border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; font-size: 11px; color: var(--text); }
+.pid-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,197,24,.1); border: 1px solid rgba(245,197,24,.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--accent); font-weight: 700; margin-bottom: 14px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* drop zone */
+.dz {
+  border: 2px dashed var(--border); border-radius: var(--r);
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: border-color .15s, background .15s; position: relative;
+}
+.dz:hover, .dz.over { border-color: var(--accent); background: rgba(245,197,24,.03); }
+.dz input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dz-icon { font-size: 30px; }
+.dz-text { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.dz-text strong { color: var(--text); }
+.thumb-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.thumb { width: 58px; height: 58px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
+.img-count { font-size: 12px; color: var(--accent); margin-top: 8px; font-weight: 600; }
+
+/* platforms */
+.plat-list { display: flex; flex-direction: column; gap: 8px; }
+.plat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 13px; background: #111; border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; user-select: none; transition: border-color .12s;
+}
+.plat-row.on { border-color: var(--purple); background: #1a1630; }
+.plat-row input { display: none; }
+.plat-name { font-weight: 600; font-size: 13px; }
+.plat-url  { font-size: 11px; color: var(--muted); }
+.toggle { width: 36px; height: 20px; background: var(--border); border-radius: 10px; position: relative; transition: background .15s; flex-shrink: 0; }
+.toggle.on { background: var(--purple); }
+.toggle::after { content: ''; position: absolute; width: 14px; height: 14px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .15s; }
+.toggle.on::after { left: 19px; }
+
+/* post button */
+.post-btn {
+  width: 100%; padding: 14px; background: var(--accent); color: #000;
+  font-size: 15px; font-weight: 800; border: none; border-radius: var(--r);
+  cursor: pointer; transition: opacity .15s; margin-top: 16px;
+  letter-spacing: .01em;
+}
+.post-btn:hover { opacity: .9; }
+.post-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* progress */
+#progress-card { display: none; }
+.pbar-wrap { background: #1e1e1e; border-radius: 4px; height: 5px; margin: 10px 0 16px; overflow: hidden; }
+.pbar { height: 100%; background: var(--purple); border-radius: 4px; transition: width .3s; width: 0%; }
+.result-list { display: flex; flex-direction: column; gap: 6px; }
+.rrow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; background: #111; border-radius: 7px; font-size: 12px;
+  border-left: 3px solid var(--border);
+}
+.rrow.ok  { border-left-color: var(--green); }
+.rrow.err { border-left-color: var(--red); }
+.rrow .r-left { display: flex; flex-direction: column; gap: 2px; }
+.rrow .r-plat { font-weight: 700; }
+.rrow .r-link { color: var(--accent); text-decoration: none; font-size: 11px; }
+.rrow .r-link:hover { text-decoration: underline; }
+.rrow .r-err { color: var(--red); font-size: 11px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fix-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35);
+  border-radius: 5px; color: var(--red); font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+}
+.fix-btn:hover { background: rgba(239,68,68,.22); }
+.fix-btn:disabled { opacity: .5; cursor: not-allowed; }
+.badge { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.badge.ok  { background: rgba(34,197,94,.15); color: var(--green); }
+.badge.err { background: rgba(239,68,68,.15); color: var(--red); }
+.log-box { font-size: 11px; color: var(--muted); font-family: monospace; max-height: 90px; overflow-y: auto; line-height: 1.6; margin-top: 10px; }
+.done-banner { margin-top: 12px; text-align: center; padding: 12px; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); border-radius: 8px; color: var(--green); font-weight: 700; display: none; }
+.done-banner.show { display: block; }
+.new-btn { display: none; width: 100%; margin-top: 10px; padding: 10px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 13px; cursor: pointer; transition: border-color .15s, color .15s; }
+.new-btn:hover { border-color: var(--accent); color: var(--accent); }
+.new-btn.show { display: block; }
+
+/* agent select */
+.agent-select {
+  width: 100%; padding: 10px 12px; background: #111; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit;
+  outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23777' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px; transition: border-color .15s;
+}
+.agent-select:focus { border-color: var(--accent); }
+.agent-select option { background: #1a1a1a; }
+
+/* spinner */
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">CW</div>
+    <div>
+      <h1>Property Listing Portal</h1>
+      <p>Paste the WhatsApp description → upload images → post everywhere</p>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- LEFT: description + images -->
+    <div>
+
+      <!-- Description input -->
+      <div class="card">
+        <div class="card-title">WhatsApp Property Description</div>
+        <textarea id="desc-input"
+          placeholder="Paste the agent's WhatsApp message here…
+
+e.g.
+4 Bedroom Semi-Detached Duplex for Rent in Lekki Phase 1
+
+Spacious fully-furnished duplex in a gated estate. Features include:
+- All rooms ensuite
+- Swimming pool
+- 24-hour security
+- Boys quarter
+
+Price: ₦18M per annum
+Contact: …"></textarea>
+        <button class="parse-btn" id="parse-btn" onclick="parseDesc()">
+          Parse Description
+        </button>
+      </div>
+
+      <!-- Agent -->
+      <div class="card">
+        <div class="card-title">Agent</div>
+        <select class="agent-select" id="agent-select">
+          <option value="">Loading agents…</option>
+        </select>
+      </div>
+
+      <!-- Parsed preview -->
+      <div class="card" id="parsed-preview">
+        <div class="card-title">Parsed Details — verify before posting</div>
+        <div id="pid-badge-wrap"></div>
+        <div class="preview-grid" id="preview-grid"></div>
+      </div>
+
+      <!-- Images -->
+      <div class="card">
+        <div class="card-title">Property Images</div>
+        <div class="dz" id="drop-zone"
+             ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+          <input type="file" id="file-input" multiple accept="image/*" onchange="filesChosen(event)">
+          <div class="dz-icon">📷</div>
+          <div class="dz-text"><strong>Click to choose</strong> or drag &amp; drop images here</div>
+        </div>
+        <div class="thumb-row" id="thumb-row"></div>
+        <div class="img-count"  id="img-count"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: platforms + post -->
+    <div>
+
+      <div class="card">
+        <div class="card-title">Post to</div>
+        <div class="plat-list">
+          <label class="plat-row on" data-p="ppng">
+            <input type="checkbox" value="ppng" checked>
+            <div><div class="plat-name">PP Nigeria</div><div class="plat-url">privateproperty.ng</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="propertypro">
+            <input type="checkbox" value="propertypro" checked>
+            <div><div class="plat-name">PropertyPro</div><div class="plat-url">propertypro.ng</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="npc">
+            <input type="checkbox" value="npc" checked>
+            <div><div class="plat-name">NPC</div><div class="plat-url">nigeriapropertycentre.com</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="airtable">
+            <input type="checkbox" value="airtable" checked>
+            <div><div class="plat-name">Airtable</div><div class="plat-url">CW Lagos base</div></div>
+            <div class="toggle on"></div>
+          </label>
+        </div>
+
+        <button class="post-btn" id="post-btn" onclick="submitJob()" disabled>
+          Post Listing
+        </button>
+      </div>
+
+      <!-- Progress -->
+      <div class="card" id="progress-card">
+        <div class="card-title">Progress</div>
+        <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
+        <div class="result-list" id="result-list"></div>
+        <div class="log-box"     id="log-box"></div>
+        <div class="done-banner" id="done-banner">Posted successfully ✓</div>
+        <button class="new-btn"  id="new-btn" onclick="resetForm()">+ Post another listing</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── state ────────────────────────────────────────────────────────────────
+const SESSION_ID = 'sess_' + Math.random().toString(36).slice(2, 10);
+let parsedProp = null;
+let uploadedFiles = [];
+
+// ── load agents ───────────────────────────────────────────────────────────
+(async function loadAgents() {
+  try {
+    const res   = await fetch('/agents');
+    const agents = await res.json();
+    const sel   = document.getElementById('agent-select');
+    sel.innerHTML = '<option value="">— Select agent —</option>';
+    agents.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value       = a.id;
+      opt.textContent = a.name;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    document.getElementById('agent-select').innerHTML =
+      '<option value="">Could not load agents</option>';
+  }
+})();
+
+// ── platform toggles ─────────────────────────────────────────────────────
+document.querySelectorAll('.plat-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const cb = row.querySelector('input');
+    cb.checked = !cb.checked;
+    row.classList.toggle('on', cb.checked);
+    row.querySelector('.toggle').classList.toggle('on', cb.checked);
+  });
+});
+
+// ── parse ─────────────────────────────────────────────────────────────────
+async function parseDesc() {
+  const text = document.getElementById('desc-input').value.trim();
+  if (!text) { alert('Paste a property description first.'); return; }
+
+  const btn = document.getElementById('parse-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Parsing…';
+
+  try {
+    const res  = await fetch('/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    parsedProp = data;
+    renderPreview(data);
+    document.getElementById('post-btn').disabled = false;
+  } catch (e) {
+    alert('Parse failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Re-parse';
+  }
+}
+
+function renderPreview(p) {
+  const preview = document.getElementById('parsed-preview');
+  const grid    = document.getElementById('preview-grid');
+  preview.style.display = 'block';
+
+  const modeLabel = { sale: 'For Sale', rent: 'For Rent', 'short-let': 'Short Let' };
+  const price     = p.price ? '₦' + Number(p.price).toLocaleString() : '—';
+  const feats     = (p.features || []).map(f => `<span class="chip">${f}</span>`).join('');
+
+  grid.innerHTML = `
+    <div class="pf full">
+      <div class="pf-label">Title</div>
+      <div class="pf-val title-val">${p.title || '—'}</div>
+    </div>
+    <div class="pf">
+      <div class="pf-label">Mode</div>
+      <div class="pf-val">${modeLabel[p.mode] || p.mode || '—'}</div>
+    </div>
+    <div class="pf">
+      <div class="pf-label">Type</div>
+      <div class="pf-val">${p.property_type || '—'}</div>
+    </div>
+    <div class="pf">
+      <div class="pf-label">Location</div>
+      <div class="pf-val">${p.location || '—'}</div>
+    </div>
+    <div class="pf">
+      <div class="pf-label">Price</div>
+      <div class="pf-val">${price}</div>
+    </div>
+    <div class="pf">
+      <div class="pf-label">Bedrooms / Baths / Toilets</div>
+      <div class="pf-val">${p.bedrooms || 0} / ${p.bathrooms || 0} / ${p.toilets || 0}</div>
+    </div>
+    ${p.street ? `<div class="pf full"><div class="pf-label">Street</div><div class="pf-val">${p.street}</div></div>` : ''}
+    ${feats ? `<div class="pf full"><div class="pf-label">Features</div><div class="chip-list">${feats}</div></div>` : ''}
+    ${p.description ? `<div class="pf full"><div class="pf-label">Description</div><div class="pf-val desc-val">${p.description.replace(/\n/g, '<br>')}</div></div>` : ''}
+  `;
+
+  // Also show selected agent in preview
+  const agentSel = document.getElementById('agent-select');
+  if (agentSel.value) {
+    const agentDiv = document.createElement('div');
+    agentDiv.className = 'pf';
+    agentDiv.innerHTML = `<div class="pf-label">Agent</div><div class="pf-val">${agentSel.options[agentSel.selectedIndex].text}</div>`;
+    grid.appendChild(agentDiv);
+  }
+}
+
+// ── images ────────────────────────────────────────────────────────────────
+function dzOver(e)  { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
+function dzLeave()  { document.getElementById('drop-zone').classList.remove('over'); }
+function dzDrop(e)  { e.preventDefault(); dzLeave(); addFiles(e.dataTransfer.files); }
+function filesChosen(e) { addFiles(e.target.files); }
+
+function addFiles(fileList) {
+  uploadedFiles.push(...Array.from(fileList));
+  renderThumbs();
+}
+
+function renderThumbs() {
+  const row   = document.getElementById('thumb-row');
+  const count = document.getElementById('img-count');
+  row.innerHTML = '';
+  uploadedFiles.slice(0, 10).forEach(f => {
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.src = URL.createObjectURL(f);
+    row.appendChild(img);
+  });
+  if (uploadedFiles.length > 10) {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;align-items:center;color:var(--muted);font-size:12px;padding:0 4px';
+    d.textContent = `+${uploadedFiles.length - 10} more`;
+    row.appendChild(d);
+  }
+  count.textContent = uploadedFiles.length
+    ? `${uploadedFiles.length} image${uploadedFiles.length > 1 ? 's' : ''} selected`
+    : '';
+}
+
+// ── current job tracking (for retries) ───────────────────────────────────
+let currentJobId = null;
+
+// ── submit ────────────────────────────────────────────────────────────────
+async function submitJob() {
+  if (!parsedProp) { alert('Parse a description first.'); return; }
+
+  const platforms = [...document.querySelectorAll('.plat-row input:checked')].map(c => c.value);
+  if (!platforms.length) { alert('Select at least one platform.'); return; }
+
+  const agentSel  = document.getElementById('agent-select');
+  const agentId   = agentSel.value;
+  const agentName = agentId ? agentSel.options[agentSel.selectedIndex].text : '';
+  if (!agentId) { alert('Please select an agent for this listing.'); return; }
+
+  const postBtn = document.getElementById('post-btn');
+  postBtn.disabled = true;
+  postBtn.innerHTML = '<span class="spin"></span>Uploading images…';
+
+  // Show progress card
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('result-list').innerHTML = '';
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('done-banner').classList.remove('show');
+  document.getElementById('new-btn').classList.remove('show');
+  document.getElementById('pbar').style.width = '0%';
+
+  // Upload images
+  if (uploadedFiles.length) {
+    const fd = new FormData();
+    fd.append('session_id', SESSION_ID);
+    uploadedFiles.forEach(f => fd.append('images', f));
+    await fetch('/upload-images', { method: 'POST', body: fd });
+  }
+
+  postBtn.innerHTML = '<span class="spin"></span>Posting…';
+
+  // Start job
+  const res = await fetch('/start-job', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      property: { ...parsedProp, agent_id: agentId, agent_name: agentName },
+      platforms,
+      session_id: SESSION_ID,
+    }),
+  });
+  const { job_id, error } = await res.json();
+  if (error) { alert(error); postBtn.disabled = false; postBtn.textContent = 'Post Listing'; return; }
+
+  currentJobId = job_id;
+
+  // Stream progress
+  const es = new EventSource(`/stream/${job_id}`);
+  es.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'pid')    showPid(ev.pid);
+    if (ev.type === 'log')    appendLog(ev.msg);
+    if (ev.type === 'result') appendResult(ev);
+    if (ev.type === 'done')   finish(postBtn, es, true);
+    if (ev.type === 'error')  { appendLog('ERROR: ' + ev.msg); finish(postBtn, es, false); }
+    if (ev.type === 'close')  finish(postBtn, es, true);
+    if (ev.progress != null)  document.getElementById('pbar').style.width = ev.progress + '%';
+  };
+}
+
+function showPid(pid) {
+  const wrap = document.getElementById('pid-badge-wrap');
+  wrap.innerHTML = `<div class="pid-badge"><span class="status-dot"></span>Property ID: ${pid}</div>`;
+}
+
+function appendLog(msg) {
+  const box  = document.getElementById('log-box');
+  const line = document.createElement('div');
+  line.textContent = msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function renderRow(row, ev) {
+  row.className = `rrow ${ev.success ? 'ok' : 'err'}`;
+  const badge = ev.success
+    ? `<span class="badge ok">✓ ${ev.images} imgs</span>`
+    : `<span class="badge err">✗</span>`;
+  const linkEl = ev.success && ev.url
+    ? `<a class="r-link" href="${ev.url}" target="_blank">View listing ↗</a>`
+    : (ev.error ? `<span class="r-err" title="${ev.error}">${ev.error.substring(0,60)}${ev.error.length>60?'…':''}</span>` : '');
+  const fixBtn = !ev.success
+    ? `<button class="fix-btn" onclick="fixAndRetry('${ev.platform}','${ev.label}',this.closest('.rrow'))">⚡ Fix &amp; Retry</button>`
+    : '';
+  row.innerHTML = `
+    <div class="r-left">
+      <span class="r-plat">${ev.label}</span>
+      ${linkEl}
+      ${fixBtn}
+    </div>
+    <div>${badge}</div>
+  `;
+}
+
+function appendResult(ev) {
+  const list = document.getElementById('result-list');
+  const row  = document.createElement('div');
+  renderRow(row, ev);
+  list.appendChild(row);
+}
+
+async function fixAndRetry(platform, label, rowEl) {
+  if (!currentJobId) { alert('No active job — please post again.'); return; }
+
+  // Show retrying state
+  rowEl.className = 'rrow';
+  rowEl.innerHTML = `
+    <div class="r-left">
+      <span class="r-plat">${label}</span>
+      <span style="font-size:11px;color:var(--muted)"><span class="spin"></span>Fixing &amp; retrying…</span>
+    </div>
+    <div><span class="badge" style="background:#1e1e1e;color:var(--muted)">…</span></div>
+  `;
+
+  try {
+    const res = await fetch('/retry-platform', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: currentJobId, platform }),
+    });
+    const ev = await res.json();
+    if (!ev.label) ev.label = label;
+    renderRow(rowEl, ev);
+  } catch (err) {
+    renderRow(rowEl, { success: false, label, platform, url: '', images: 0, error: String(err) });
+  }
+}
+
+function finish(btn, es, success) {
+  es.close();
+  btn.disabled = false;
+  btn.textContent = 'Post Listing';
+  document.getElementById('pbar').style.width = '100%';
+  if (success) document.getElementById('done-banner').classList.add('show');
+  document.getElementById('new-btn').classList.add('show');
+}
+
+function resetForm() {
+  parsedProp  = null;
+  uploadedFiles = [];
+  document.getElementById('desc-input').value = '';
+  document.getElementById('agent-select').value = '';
+  document.getElementById('parsed-preview').style.display = 'none';
+  document.getElementById('progress-card').style.display = 'none';
+  document.getElementById('thumb-row').innerHTML = '';
+  document.getElementById('img-count').textContent = '';
+  document.getElementById('post-btn').disabled = true;
+  document.getElementById('parse-btn').textContent = 'Parse Description';
+  document.getElementById('pid-badge-wrap').innerHTML = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
