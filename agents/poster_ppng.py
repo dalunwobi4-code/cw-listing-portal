@@ -12,8 +12,7 @@ Confirmed working flow:
 
 import requests, re, os, time, threading
 import urllib3
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+import cloudscraper
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -53,14 +52,10 @@ FEATURE_CODES = {
 
 
 def make_session():
-    s = requests.Session()
-    s.headers["User-Agent"] = (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    s = cloudscraper.create_scraper(
+        browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
     s.verify = False
-    retry = Retry(total=5, backoff_factor=2, allowed_methods=["GET", "POST"])
-    s.mount("https://", HTTPAdapter(max_retries=retry))
     return s
 
 
