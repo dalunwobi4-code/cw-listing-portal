@@ -1,5 +1,6 @@
 """
-Airtable poster — uploads watermarked images to Lagos Properties table.
+Airtable poster — uploads original (non-watermarked) images to Lagos Properties table.
+Watermark is applied by the Framer frame on cwlagos.com, not here.
 
 Table structure:
 - 'Property ID'    → CW reference number (CW08494 etc.) — used to find the record

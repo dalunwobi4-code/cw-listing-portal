@@ -5,3 +5,4 @@ urllib3==2.6.3
 Pillow==12.2.0
 gunicorn==21.2.0
 cloudscraper==1.2.71
+anthropic>=0.40.0

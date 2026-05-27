@@ -58,6 +58,14 @@ if _PROXY_URL:
         CREDENTIALS.setdefault(_p, {})["proxy_url"] = _PROXY_URL
 
 import requests as req
+try:
+    import anthropic as _anthropic_sdk
+    _ANTHROPIC_CLIENT = _anthropic_sdk.Anthropic(
+        api_key=CREDENTIALS.get("anthropic", {}).get("api_key", "")
+            or os.environ.get("ANTHROPIC_API_KEY", "")
+    ) if (CREDENTIALS.get("anthropic", {}).get("api_key") or os.environ.get("ANTHROPIC_API_KEY")) else None
+except ImportError:
+    _ANTHROPIC_CLIENT = None
 
 PLATFORM_POSTERS = {
     "ppng":        post_ppng,
@@ -135,12 +143,28 @@ def get_next_pid() -> str:
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
 
 LOCATIONS = [
-    "Lekki Phase 1", "Chevron Drive", "Victoria Island", "Ikoyi", "Lekki",
+    "Lekki Phase 1", "Lekki Phase 2", "Chevron Drive", "Chevron",
+    "Victoria Island", "VI", "Ikoyi", "Banana Island", "Magodo",
+    "Ikeja GRA", "Ikeja", "Oniru", "Ajah", "Sangotedo", "Agungi",
+    "Osapa London", "Osapa", "Idado", "Lafiaji", "Lekki",
 ]
 PROPERTY_TYPES = [
     "Semi-detached Duplex", "Terraced Duplex", "Detached Duplex",
-    "Apartment", "Flat", "House",
+    "Apartment", "Flat", "Duplex", "Bungalow", "House", "Studio",
+    "Mansion", "Penthouse", "Townhouse",
+    # Non-residential
+    "Land", "Commercial Property", "Office Space", "Shop", "Warehouse",
+    "Plaza", "Factory", "Event Centre",
 ]
+
+# Aliases for property type matching (handles WhatsApp shorthand)
+_PTYPE_ALIASES = {
+    "semi detached duplex": "Semi-detached Duplex",
+    "semi detached": "Semi-detached Duplex",
+    "terrace duplex": "Terraced Duplex",
+    "terraced duplex": "Terraced Duplex",
+    "detached duplex": "Detached Duplex",
+}
 FEATURE_KEYWORDS = {
     "All Room Ensuite":   ["all room ensuite", "all rooms ensuite", "en-suite", "ensuite"],
     "Swimming Pool":      ["swimming pool", "pool"],
@@ -201,10 +225,16 @@ def parse_description(text: str) -> dict:
 
     # ── property type ─────────────────────────────────────────────────────
     property_type = "Flat"
-    for pt in PROPERTY_TYPES:
-        if pt.lower() in t_low:
-            property_type = pt
+    # Check aliases first (handles "semi detached" without hyphen, etc.)
+    for alias, canonical in _PTYPE_ALIASES.items():
+        if alias in t_low:
+            property_type = canonical
             break
+    else:
+        for pt in PROPERTY_TYPES:
+            if pt.lower() in t_low:
+                property_type = pt
+                break
 
     # ── location ──────────────────────────────────────────────────────────
     location = "Lekki Phase 1"
@@ -248,14 +278,14 @@ def parse_description(text: str) -> dict:
             features.append(feat)
 
     # ── title ─────────────────────────────────────────────────────────────
-    # Use first line if it looks like a title, else build one
-    first_line = lines[0] if lines else ""
-    if (len(first_line) > 20 and
-            re.search(r"bed|flat|duplex|apartment|house|sale|rent", first_line, re.I)):
-        title = first_line
+    # Standard format: "3 Bedroom Semi-detached Duplex in Lekki Phase 1"
+    # Land/commercial (no bedroom count): "Commercial Property in VI" etc.
+    _NON_RESIDENTIAL = {"Land", "Commercial", "Office", "Shop", "Warehouse",
+                        "Plaza", "Factory", "Mall", "Event Centre"}
+    if property_type in _NON_RESIDENTIAL or not bedrooms:
+        title = f"{property_type} in {location}"
     else:
-        mode_str = {"sale": "for Sale", "rent": "for Rent", "short-let": "for Short Let"}[mode]
-        title = f"{bedrooms} Bedroom {property_type} {mode_str} in {location}"
+        title = f"{bedrooms} Bedroom {property_type} in {location}"
 
     # ── extract feature bullets from raw text ────────────────────────────
     BULLET_PAT   = re.compile(
@@ -266,19 +296,43 @@ def parse_description(text: str) -> dict:
         r'price[:\s]|₦|\bcontact\b|\bcall\b|per annum|p\.a\.|per year|📍|💰', re.IGNORECASE)
 
     raw_bullets = []
+
+    # First pass: lines with explicit bullet symbols
     for line in lines:
-        line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()  # strip WA bold
+        line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
         if BULLET_PAT.match(line):
-            text = BULLET_STRIP.sub('', line).strip()
-            if text and not SKIP_PRICE.search(text):
-                raw_bullets.append(text)
+            cleaned = BULLET_STRIP.sub('', line).strip()
+            if cleaned and not SKIP_PRICE.search(cleaned):
+                raw_bullets.append(cleaned)
+
+    # Second pass: plain lines under a "Features:" section header
+    if not raw_bullets or len(raw_bullets) < 3:
+        in_features = False
+        SKIP_FEAT = re.compile(
+            r'(?:price|rent|agency|legal|caution|service charge|total|contact|'
+            r'call|location|per annum|₦|p\.a\.|per year|charges|other)',
+            re.IGNORECASE
+        )
+        for line in lines:
+            line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
+            if re.match(r'features?\s*:?$', line, re.IGNORECASE):
+                in_features = True
+                continue
+            if in_features:
+                # Stop when we hit another section header
+                if re.search(r':\s*$', line) and len(line) < 40:
+                    in_features = False
+                    continue
+                if line and not SKIP_FEAT.search(line) and not BULLET_PAT.match(line):
+                    if line not in raw_bullets:
+                        raw_bullets.append(line)
 
     # ── build formatted description from parsed data ──────────────────────
     prop_stub = {
         "mode": mode, "property_type": property_type, "location": location,
         "bedrooms": bedrooms, "price": price, "features": features,
     }
-    description = build_formatted_description(prop_stub, raw_bullets)
+    description = build_formatted_description(prop_stub, raw_bullets, raw_text=text)
 
     return {
         "title":         title,
@@ -326,56 +380,128 @@ def _categorise(bullets: list) -> tuple[list, list]:
     return unit, building
 
 
-def generate_overview(prop: dict, raw_bullets: list) -> str:
+def generate_overview(prop: dict, raw_bullets: list, raw_text: str = "") -> str:
     """
-    Generate a 2–3 sentence natural language overview in the CW template style.
-    Uses raw_bullets (from WhatsApp) for rich detail, falls back to canonical features.
+    Generate a 3-5 line SEO-optimised intro using Claude API.
+    Falls back to a basic template if Claude is unavailable.
     """
-    beds     = prop.get('bedrooms', '')
-    ptype    = prop.get('property_type', 'property').lower()
-    loc      = prop.get('location', '')
-    mode     = prop.get('mode', 'sale')
-    features = prop.get('features', [])
+    beds  = prop.get('bedrooms', '')
+    ptype = prop.get('property_type', 'property')
+    loc   = prop.get('location', '')
+    mode  = prop.get('mode', 'sale')
+    price = prop.get('price', 0)
 
-    MODE_PHRASE = {"sale": "for sale", "rent": "to let", "short-let": "for short let"}
-    mode_str    = MODE_PHRASE.get(mode, "for sale")
+    MODE_PHRASE = {"sale": "for Sale", "rent": "for Rent", "short-let": "for Short Let"}
+    mode_str  = MODE_PHRASE.get(mode, "for Sale")
+    price_str = f"₦{price:,}" if price else "Price on request"
 
-    # Use raw WhatsApp bullets for richness; fall back to canonical tags
-    all_feats = raw_bullets if raw_bullets else [f for f in features]
+    # ── try Claude API ───────────────────────────────────────────────────────
+    if _ANTHROPIC_CLIENT:
+        try:
+            features_text = "\n".join(f"- {b}" for b in raw_bullets) if raw_bullets else \
+                            "\n".join(f"- {f}" for f in prop.get('features', []))
 
-    if not all_feats:
-        return f"Beautifully finished {beds} bedroom {ptype} {mode_str} in {loc}."
+            prompt = f"""You are an SEO copywriter for a premium Nigerian real estate agency.
 
-    unit_feats, build_feats = _categorise(all_feats)
+Write a SHORT, keyword-rich property intro for online listing portals.
 
-    # Sentence 1: what the property is
-    s1 = f"Beautifully finished {beds} bedroom {ptype} {mode_str} in {loc}."
+Property:
+- {beds} Bedroom {ptype} {mode_str}
+- Location: {loc}, Lagos, Nigeria
+- Price: {price_str}
+- Features: {', '.join(raw_bullets) if raw_bullets else '(see listing)'}
 
-    # Sentence 2: unit-level features
-    if unit_feats:
-        s2 = f"Each unit features {_join([f.lower() for f in unit_feats])}."
-    else:
-        s2 = ""
+Rules:
+1. Write EXACTLY 3 sentences — no more, no less
+2. Sentence 1: hook with property type, bedrooms, mode, location, and price
+3. Sentence 2: highlight the best 3-4 interior features
+4. Sentence 3: mention key building/estate amenity + location appeal
+5. Pack in SEO keywords naturally: "{beds} bedroom {ptype.lower()} {mode_str.lower()} {loc}", "Lagos real estate", "{loc} Lagos"
+6. Tone: premium, confident, aspirational
+7. NO bullet points, NO headers, NO markdown — pure flowing sentences
+8. Do NOT mention any agency name or contact details
+9. Output ONLY the 3 sentences, nothing else"""
 
-    # Sentence 3: building/shared amenities
-    if build_feats:
-        s3 = f"The development includes {_join([f.lower() for f in build_feats])}."
-    else:
-        s3 = ""
+            message = _ANTHROPIC_CLIENT.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=200,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return message.content[0].text.strip()
 
+        except Exception as e:
+            print(f"[Claude API] SEO description failed: {e}", flush=True)
+
+    # ── fallback: basic template ─────────────────────────────────────────────
+    all_feats = raw_bullets if raw_bullets else prop.get('features', [])
+    unit_feats, build_feats = _categorise(all_feats) if all_feats else ([], [])
+
+    s1 = f"Beautifully finished {beds} bedroom {ptype.lower()} {mode_str.lower()} in {loc}."
+    s2 = f"Each unit features {_join([f.lower() for f in unit_feats])}." if unit_feats else ""
+    s3 = f"The development includes {_join([f.lower() for f in build_feats])}." if build_feats else ""
     return " ".join(s for s in [s1, s2, s3] if s)
 
 
-def build_formatted_description(prop: dict, raw_bullets: list) -> str:
+def parse_financials(raw_text: str, price: int) -> list:
+    """
+    Extract all financial details from the raw WhatsApp text.
+    Returns a list of '• Label: Value' strings.
+    """
+    lines = []
+    t = raw_text or ""
+
+    # Rent / Price
+    rent_match = re.search(
+        r"(?:rent|price)[:\s]+([₦N]?\s*[\d,\.]+(?:\s*(?:million|m|k))?"
+        r"(?:\s*per\s+(?:annum|year|month|day))?[^\n]*)",
+        t, re.IGNORECASE
+    )
+    if price:
+        # Use the structured price + any "per annum" suffix from raw text
+        suffix = ""
+        if rent_match:
+            raw_val = rent_match.group(1).strip()
+            pa = re.search(r"per\s+(?:annum|year|month|day)", raw_val, re.IGNORECASE)
+            if pa:
+                suffix = f" {pa.group(0)}"
+        lines.append(f"• Rent: ₦{price:,}{suffix}")
+    elif rent_match:
+        lines.append(f"• Rent: {rent_match.group(1).strip()}")
+
+    # Generic charge patterns: "Label: Value" lines in Other Charges block
+    charge_patterns = [
+        (r"agency[:\s]+([^\n]+)",          "Agency Fee"),
+        (r"legal[:\s]+([^\n]+)",            "Legal Fee"),
+        (r"caution[:\s]+([^\n]+)",          "Caution"),
+        (r"service\s+charge[:\s]+([^\n]+)", "Service Charge"),
+        (r"total\s+package[:\s]+([^\n]+)",  "Total Package"),
+        (r"agreement[:\s]+([^\n]+)",        "Agreement Fee"),
+        (r"commission[:\s]+([^\n]+)",       "Commission"),
+    ]
+    for pat, label in charge_patterns:
+        m = re.search(pat, t, re.IGNORECASE)
+        if m:
+            val = m.group(1).strip().rstrip(",;")
+            lines.append(f"• {label}: {val}")
+
+    return lines
+
+
+def build_formatted_description(prop: dict, raw_bullets: list, raw_text: str = "") -> str:
     """
     Build the full CW listing description:
-      [Generated prose overview]
+      [3-sentence SEO overview]
 
       Property Features:
-      • ...
+      • <every feature from WhatsApp>
 
       Financial Details:
-      • Price: ₦X
+      • Rent: ₦X per annum
+      • Agency Fee: 10%
+      • Legal Fee: 10%
+      • Caution: ₦1,000,000
+      • Service Charge: ₦60,000 monthly
+      • Total Package: ₦16,600,000
 
       📍 Location | 💰 ₦X
     """
@@ -383,15 +509,21 @@ def build_formatted_description(prop: dict, raw_bullets: list) -> str:
     loc       = prop.get('location', '')
     price_str = f"₦{price:,}" if price else "Price on request"
 
-    overview = generate_overview(prop, raw_bullets)
+    overview = generate_overview(prop, raw_bullets, raw_text)
 
+    # All features from WhatsApp (raw_bullets has everything — don't filter)
     feature_bullets = ([f"• {b}" for b in raw_bullets] if raw_bullets
                        else [f"• {f}" for f in prop.get('features', [])])
+
+    # Full financial breakdown from raw text
+    fin_lines = parse_financials(raw_text, price)
+    if not fin_lines:
+        fin_lines = [f"• Price: {price_str}"]
 
     parts = [overview, ""]
     if feature_bullets:
         parts += ["Property Features:", ""] + feature_bullets + [""]
-    parts += ["Financial Details:", "", f"• Price: {price_str}", ""]
+    parts += ["Financial Details:", ""] + fin_lines + [""]
     parts.append(f"📍 {loc} | 💰 {price_str}")
     return "\n".join(parts)
 
@@ -459,7 +591,9 @@ def run_job(job_id, prop, platforms, raw_image_paths):
             poster = PLATFORM_POSTERS[platform]
             creds  = CREDENTIALS[platform]
             emit(q, "log", {"msg": f"  [{PLATFORM_LABELS[platform]}] posting…"})
-            return platform, poster(prop, watermarked, creds)
+            # Airtable gets originals — watermark is already on the Framer frame
+            imgs = enhanced if platform == "airtable" else watermarked
+            return platform, poster(prop, imgs, creds)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=total) as ex:
             futures = {ex.submit(post_one, p): p for p in platforms}

@@ -21,7 +21,8 @@ echo "✅ Python $(python3 --version)"
 # 2. Install pip packages
 echo ""
 echo "📦 Installing packages (this takes ~2 minutes)..."
-pip3 install -q -r requirements.txt
+pip3 install -q -r requirements.txt 2>/dev/null || \
+pip3 install -q -r requirements.txt --break-system-packages
 echo "✅ Packages installed"
 
 # 3. Create directories
