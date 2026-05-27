@@ -1,22 +1,23 @@
 """
-Copy this file to orchestrate.py and fill in your credentials.
-orchestrate.py is gitignored — never commit real credentials.
+CW Lagos — Credentials template
+The installer (install.sh) fills this in automatically.
+Do not commit real credentials here.
 """
 
 CREDENTIALS = {
     "ppng": {
-        "email": "your-ppng-email@example.com",
-        "password": "your-ppng-password",
+        "email": "PPNG_EMAIL",
+        "password": "PPNG_PASSWORD",
     },
     "propertypro": {
-        "email": "your-propertypro-email@example.com",
-        "password": "your-propertypro-password",
+        "email": "PROPERTYPRO_EMAIL",
+        "password": "PROPERTYPRO_PASSWORD",
     },
     "npc": {
-        "email": "your-npc-email@example.com",
-        "password": "your-npc-password",
+        "email": "NPC_EMAIL",
+        "password": "NPC_PASSWORD",
     },
     "airtable": {
-        "token": "patXXXXXXXXXXXXXX.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "token": "AIRTABLE_TOKEN",
     },
 }
