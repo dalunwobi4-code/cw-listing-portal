@@ -21,9 +21,14 @@ echo "✅ Python $(python3 --version)"
 # 2. Install pip packages
 echo ""
 echo "📦 Installing packages (this takes ~2 minutes)..."
-pip3 install -q -r requirements.txt 2>/dev/null || \
-pip3 install -q -r requirements.txt --break-system-packages
-echo "✅ Packages installed"
+if pip3 install -q -r requirements.txt 2>/dev/null; then
+    echo "✅ Packages installed"
+elif pip3 install -q -r requirements.txt --break-system-packages 2>/dev/null; then
+    echo "✅ Packages installed"
+else
+    pip3 install -r requirements.txt --user
+    echo "✅ Packages installed"
+fi
 
 # 3. Create directories
 mkdir -p web/uploads watermarked enhanced raw_images logs web/static
