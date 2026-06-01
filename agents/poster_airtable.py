@@ -85,7 +85,8 @@ def find_record(token: str, ref: str) -> dict | None:
         params={
             "filterByFormula": f"{{Property ID}}='{ref}'",
             "maxRecords": 1
-        }
+        },
+        timeout=15
     )
     records = r.json().get("records", [])
     return records[0] if records else None
@@ -135,7 +136,8 @@ def create_record(token: str, prop: dict) -> str:
     r = requests.post(
         f"{API}/{BASE_ID}/{TABLE}",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json={"fields": fields}
+        json={"fields": fields},
+        timeout=15
     )
     data = r.json()
     if "id" not in data:
@@ -200,7 +202,8 @@ def upload_attachment(token: str, record_id: str, field_id: str, image_path: str
             "contentType": "image/jpeg",
             "filename": filename,
             "file": b64
-        }
+        },
+        timeout=60
     )
     if r.status_code in (200, 201):
         return {"success": True, "field_id": field_id}

@@ -142,6 +142,18 @@ textarea::placeholder { color: var(--muted); }
 .new-btn:hover { border-color: var(--accent); color: var(--accent); }
 .new-btn.show { display: block; }
 
+/* jobs strip */
+#jobs-section { margin-top: 32px; display: flex; flex-direction: column; gap: 16px; }
+.job-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; }
+.job-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.job-title { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+.job-pid { font-size: 11px; color: var(--accent); font-weight: 700; }
+.job-card .pbar-wrap { margin: 0 0 12px; }
+.job-card .result-list { gap: 5px; }
+.job-card .log-box { max-height: 60px; margin-top: 8px; }
+.job-card .done-banner { margin-top: 8px; }
+.airtable-notice { font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic; }
+
 /* agent select */
 .agent-select {
   width: 100%; padding: 10px 12px; background: #111; border: 1px solid var(--border);
@@ -260,35 +272,28 @@ Contact: …"></textarea>
         </button>
       </div>
 
-      <!-- Progress -->
-      <div class="card" id="progress-card">
-        <div class="card-title">Progress</div>
-        <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
-        <div class="result-list" id="result-list"></div>
-        <div class="log-box"     id="log-box"></div>
-        <div class="done-banner" id="done-banner">Posted successfully ✓</div>
-        <button class="new-btn"  id="new-btn" onclick="resetForm()">+ Post another listing</button>
-      </div>
-
     </div>
   </div>
+
+  <!-- Jobs strip — one card per submitted listing -->
+  <div id="jobs-section"></div>
+
 </div>
 
 <script>
 // ── state ────────────────────────────────────────────────────────────────
-const SESSION_ID = 'sess_' + Math.random().toString(36).slice(2, 10);
-let parsedProp = null;
+let parsedProp    = null;
 let uploadedFiles = [];
 
 // ── load agents ───────────────────────────────────────────────────────────
 (async function loadAgents() {
   try {
-    const res   = await fetch('/agents');
+    const res    = await fetch('/agents');
     const agents = await res.json();
-    const sel   = document.getElementById('agent-select');
+    const sel    = document.getElementById('agent-select');
     sel.innerHTML = '<option value="">— Select agent —</option>';
     agents.forEach(a => {
-      const opt = document.createElement('option');
+      const opt       = document.createElement('option');
       opt.value       = a.id;
       opt.textContent = a.name;
       sel.appendChild(opt);
@@ -326,7 +331,6 @@ async function parseDesc() {
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-
     parsedProp = data;
     renderPreview(data);
     document.getElementById('post-btn').disabled = false;
@@ -377,20 +381,19 @@ function renderPreview(p) {
     ${p.description ? `<div class="pf full"><div class="pf-label">Description</div><div class="pf-val desc-val">${p.description.replace(/\n/g, '<br>')}</div></div>` : ''}
   `;
 
-  // Also show selected agent in preview
   const agentSel = document.getElementById('agent-select');
   if (agentSel.value) {
-    const agentDiv = document.createElement('div');
-    agentDiv.className = 'pf';
-    agentDiv.innerHTML = `<div class="pf-label">Agent</div><div class="pf-val">${agentSel.options[agentSel.selectedIndex].text}</div>`;
-    grid.appendChild(agentDiv);
+    const div = document.createElement('div');
+    div.className = 'pf';
+    div.innerHTML = `<div class="pf-label">Agent</div><div class="pf-val">${agentSel.options[agentSel.selectedIndex].text}</div>`;
+    grid.appendChild(div);
   }
 }
 
 // ── images ────────────────────────────────────────────────────────────────
-function dzOver(e)  { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
-function dzLeave()  { document.getElementById('drop-zone').classList.remove('over'); }
-function dzDrop(e)  { e.preventDefault(); dzLeave(); addFiles(e.dataTransfer.files); }
+function dzOver(e)      { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
+function dzLeave()      { document.getElementById('drop-zone').classList.remove('over'); }
+function dzDrop(e)      { e.preventDefault(); dzLeave(); addFiles(e.dataTransfer.files); }
 function filesChosen(e) { addFiles(e.target.files); }
 
 function addFiles(fileList) {
@@ -419,9 +422,6 @@ function renderThumbs() {
     : '';
 }
 
-// ── current job tracking (for retries) ───────────────────────────────────
-let currentJobId = null;
-
 // ── submit ────────────────────────────────────────────────────────────────
 async function submitJob() {
   if (!parsedProp) { alert('Parse a description first.'); return; }
@@ -438,98 +438,126 @@ async function submitJob() {
   postBtn.disabled = true;
   postBtn.innerHTML = '<span class="spin"></span>Uploading images…';
 
-  // Show progress card
-  document.getElementById('progress-card').style.display = 'block';
-  document.getElementById('result-list').innerHTML = '';
-  document.getElementById('log-box').innerHTML = '';
-  document.getElementById('done-banner').classList.remove('show');
-  document.getElementById('new-btn').classList.remove('show');
-  document.getElementById('pbar').style.width = '0%';
+  // Snapshot current form state before clearing
+  const prop          = { ...parsedProp, agent_id: agentId, agent_name: agentName };
+  const sessionId     = 'sess_' + Math.random().toString(36).slice(2, 10);
+  const filesToUpload = uploadedFiles.slice();
+  const jobTitle      = parsedProp.title || 'Property';
 
   // Upload images
-  if (uploadedFiles.length) {
+  if (filesToUpload.length) {
     const fd = new FormData();
-    fd.append('session_id', SESSION_ID);
-    uploadedFiles.forEach(f => fd.append('images', f));
+    fd.append('session_id', sessionId);
+    filesToUpload.forEach(f => fd.append('images', f));
     await fetch('/upload-images', { method: 'POST', body: fd });
   }
-
-  postBtn.innerHTML = '<span class="spin"></span>Posting…';
 
   // Start job
   const res = await fetch('/start-job', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      property: { ...parsedProp, agent_id: agentId, agent_name: agentName },
-      platforms,
-      session_id: SESSION_ID,
-    }),
+    body: JSON.stringify({ property: prop, platforms, session_id: sessionId }),
   });
   const { job_id, error } = await res.json();
   if (error) { alert(error); postBtn.disabled = false; postBtn.textContent = 'Post Listing'; return; }
 
-  currentJobId = job_id;
+  // ── Immediately clear form for next listing ──────────────────────────
+  resetForm();
 
-  // Stream progress
-  const es = new EventSource(`/stream/${job_id}`);
+  // ── Spawn a job card at the bottom ───────────────────────────────────
+  spawnJobCard(job_id, jobTitle, platforms);
+}
+
+// ── job card ──────────────────────────────────────────────────────────────
+function spawnJobCard(jobId, title, platforms) {
+  const section = document.getElementById('jobs-section');
+
+  const card = document.createElement('div');
+  card.className = 'job-card';
+  card.id = `job-${jobId}`;
+  card.innerHTML = `
+    <div class="job-card-header">
+      <span class="job-title">${title}</span>
+      <span class="job-pid" id="jpid-${jobId}">getting ID…</span>
+    </div>
+    <div class="pbar-wrap"><div class="pbar" id="jpbar-${jobId}" style="width:0%"></div></div>
+    <div class="result-list" id="jresults-${jobId}"></div>
+    <div class="log-box"     id="jlog-${jobId}"></div>
+    <div class="done-banner" id="jdone-${jobId}">Posted successfully ✓</div>
+    ${platforms.includes('airtable') ? `<div class="airtable-notice" id="jat-${jobId}">Airtable uploading images in background…</div>` : ''}
+  `;
+  section.prepend(card); // newest on top
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Stream events for this job
+  const es = new EventSource(`/stream/${jobId}`);
   es.onmessage = e => {
     const ev = JSON.parse(e.data);
-    if (ev.type === 'pid')    showPid(ev.pid);
-    if (ev.type === 'log')    appendLog(ev.msg);
-    if (ev.type === 'result') appendResult(ev);
-    if (ev.type === 'done')   finish(postBtn, es, true);
-    if (ev.type === 'error')  { appendLog('ERROR: ' + ev.msg); finish(postBtn, es, false); }
-    if (ev.type === 'close')  finish(postBtn, es, true);
-    if (ev.progress != null)  document.getElementById('pbar').style.width = ev.progress + '%';
+    if (ev.type === 'pid') {
+      document.getElementById(`jpid-${jobId}`).textContent = ev.pid;
+    }
+    if (ev.type === 'log') {
+      const box  = document.getElementById(`jlog-${jobId}`);
+      const line = document.createElement('div');
+      line.textContent = ev.msg;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+    if (ev.type === 'result') {
+      appendJobResult(jobId, ev);
+      // Hide airtable notice once it reports back
+      if (ev.platform === 'airtable') {
+        const notice = document.getElementById(`jat-${jobId}`);
+        if (notice) notice.remove();
+      }
+    }
+    if (ev.progress != null) {
+      document.getElementById(`jpbar-${jobId}`).style.width = ev.progress + '%';
+    }
+    if (ev.type === 'partial_done') {
+      // Main platforms done — show banner but keep stream open for Airtable
+      document.getElementById(`jdone-${jobId}`).classList.add('show');
+    }
+    if (ev.type === 'done' || ev.type === 'close') {
+      es.close();
+      document.getElementById(`jpbar-${jobId}`).style.width = '100%';
+      document.getElementById(`jdone-${jobId}`).classList.add('show');
+      // Remove "uploading in background" notice once fully done
+      const notice = document.getElementById(`jat-${jobId}`);
+      if (notice) notice.remove();
+    }
+    if (ev.type === 'error') {
+      es.close();
+      const box  = document.getElementById(`jlog-${jobId}`);
+      const line = document.createElement('div');
+      line.style.color = 'var(--red)';
+      line.textContent = 'ERROR: ' + ev.msg;
+      box.appendChild(line);
+    }
   };
 }
 
-function showPid(pid) {
-  const wrap = document.getElementById('pid-badge-wrap');
-  wrap.innerHTML = `<div class="pid-badge"><span class="status-dot"></span>Property ID: ${pid}</div>`;
-}
-
-function appendLog(msg) {
-  const box  = document.getElementById('log-box');
-  const line = document.createElement('div');
-  line.textContent = msg;
-  box.appendChild(line);
-  box.scrollTop = box.scrollHeight;
-}
-
-function renderRow(row, ev) {
+function appendJobResult(jobId, ev) {
+  const list = document.getElementById(`jresults-${jobId}`);
+  const row  = document.createElement('div');
   row.className = `rrow ${ev.success ? 'ok' : 'err'}`;
-  const badge = ev.success
+  const badge  = ev.success
     ? `<span class="badge ok">✓ ${ev.images} imgs</span>`
     : `<span class="badge err">✗</span>`;
   const linkEl = ev.success && ev.url
     ? `<a class="r-link" href="${ev.url}" target="_blank">View listing ↗</a>`
     : (ev.error ? `<span class="r-err" title="${ev.error}">${ev.error.substring(0,60)}${ev.error.length>60?'…':''}</span>` : '');
   const fixBtn = !ev.success
-    ? `<button class="fix-btn" onclick="fixAndRetry('${ev.platform}','${ev.label}',this.closest('.rrow'))">⚡ Fix &amp; Retry</button>`
+    ? `<button class="fix-btn" onclick="fixAndRetry('${ev.platform}','${ev.label}','${jobId}',this.closest('.rrow'))">⚡ Fix &amp; Retry</button>`
     : '';
   row.innerHTML = `
-    <div class="r-left">
-      <span class="r-plat">${ev.label}</span>
-      ${linkEl}
-      ${fixBtn}
-    </div>
+    <div class="r-left"><span class="r-plat">${ev.label}</span>${linkEl}${fixBtn}</div>
     <div>${badge}</div>
   `;
-}
-
-function appendResult(ev) {
-  const list = document.getElementById('result-list');
-  const row  = document.createElement('div');
-  renderRow(row, ev);
   list.appendChild(row);
 }
 
-async function fixAndRetry(platform, label, rowEl) {
-  if (!currentJobId) { alert('No active job — please post again.'); return; }
-
-  // Show retrying state
+async function fixAndRetry(platform, label, jobId, rowEl) {
   rowEl.className = 'rrow';
   rowEl.innerHTML = `
     <div class="r-left">
@@ -538,42 +566,38 @@ async function fixAndRetry(platform, label, rowEl) {
     </div>
     <div><span class="badge" style="background:#1e1e1e;color:var(--muted)">…</span></div>
   `;
-
   try {
     const res = await fetch('/retry-platform', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: currentJobId, platform }),
+      body: JSON.stringify({ job_id: jobId, platform }),
     });
     const ev = await res.json();
     if (!ev.label) ev.label = label;
-    renderRow(rowEl, ev);
+    const row2 = document.createElement('div');
+    appendJobResult(jobId, { ...ev, label });
+    rowEl.replaceWith(row2);
   } catch (err) {
-    renderRow(rowEl, { success: false, label, platform, url: '', images: 0, error: String(err) });
+    rowEl.className = 'rrow err';
+    rowEl.innerHTML = `<div class="r-left"><span class="r-plat">${label}</span><span class="r-err">${err}</span></div><div><span class="badge err">✗</span></div>`;
   }
 }
 
-function finish(btn, es, success) {
-  es.close();
-  btn.disabled = false;
-  btn.textContent = 'Post Listing';
-  document.getElementById('pbar').style.width = '100%';
-  if (success) document.getElementById('done-banner').classList.add('show');
-  document.getElementById('new-btn').classList.add('show');
-}
-
+// ── reset form ────────────────────────────────────────────────────────────
 function resetForm() {
-  parsedProp  = null;
+  parsedProp    = null;
   uploadedFiles = [];
-  document.getElementById('desc-input').value = '';
-  document.getElementById('agent-select').value = '';
+  document.getElementById('desc-input').value             = '';
+  document.getElementById('agent-select').value           = '';
   document.getElementById('parsed-preview').style.display = 'none';
-  document.getElementById('progress-card').style.display = 'none';
-  document.getElementById('thumb-row').innerHTML = '';
-  document.getElementById('img-count').textContent = '';
-  document.getElementById('post-btn').disabled = true;
-  document.getElementById('parse-btn').textContent = 'Parse Description';
-  document.getElementById('pid-badge-wrap').innerHTML = '';
+  document.getElementById('thumb-row').innerHTML          = '';
+  document.getElementById('img-count').textContent        = '';
+  document.getElementById('file-input').value             = '';   // allow re-selecting same files
+  const postBtn = document.getElementById('post-btn');
+  postBtn.disabled  = true;
+  postBtn.textContent = 'Post Listing';                           // reset button text
+  document.getElementById('parse-btn').textContent        = 'Parse Description';
+  document.getElementById('pid-badge-wrap').innerHTML     = '';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 </script>

@@ -79,6 +79,7 @@ PLATFORM_LABELS = {
 }
 
 AIRTABLE_BASE_ID = "appui0GIVsqalToEa"
+_PID_LOCK = threading.Lock()  # prevents two simultaneous jobs getting the same PID
 AIRTABLE_TABLE   = "Lagos Properties"
 AIRTABLE_TOKEN   = CREDENTIALS.get("airtable", {}).get("token", "")
 
@@ -114,30 +115,27 @@ def get_agents() -> list:
 # ── Airtable: get next PID ───────────────────────────────────────────────────
 
 def get_next_pid() -> str:
-    """Query Airtable for the highest CW##### and return the next one."""
+    """Query Airtable for the highest CW##### and return the next one.
+    Fetches the 50 most recently created records in one call — fast regardless
+    of table size, handles mixed ID formats (ND235, CWL1457, CW#####).
+    """
     url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
     headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
     params  = {
         "fields[]": "Property ID",
-        "pageSize": 100,
+        "maxRecords": 50,
+        "sort[0][field]": "Created Time",
+        "sort[0][direction]": "desc",
     }
+    r    = req.get(url, headers=headers, params=params, timeout=15)
+    data = r.json()
     max_num = 0
-    offset  = None
-    while True:
-        if offset:
-            params["offset"] = offset
-        r = req.get(url, headers=headers, params=params)
-        data = r.json()
-        for rec in data.get("records", []):
-            pid = rec.get("fields", {}).get("Property ID", "")
-            m = re.match(r"CW(\d+)", str(pid), re.IGNORECASE)
-            if m:
-                max_num = max(max_num, int(m.group(1)))
-        offset = data.get("offset")
-        if not offset:
-            break
-    next_num = max_num + 1
-    return f"CW{next_num:05d}"
+    for rec in data.get("records", []):
+        pid = rec.get("fields", {}).get("Property ID", "")
+        m = re.match(r"CW(\d+)$", str(pid), re.IGNORECASE)
+        if m:
+            max_num = max(max_num, int(m.group(1)))
+    return f"CW{max_num + 1:05d}"
 
 
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
@@ -538,7 +536,8 @@ def run_job(job_id, prop, platforms, raw_image_paths):
     q = JOBS[job_id]["events"]
     try:
         emit(q, "log", {"msg": f"Getting next Property ID from Airtable…"})
-        pid = get_next_pid()
+        with _PID_LOCK:
+            pid = get_next_pid()
         prop["ref"] = pid
         emit(q, "pid", {"pid": pid})
         emit(q, "log", {"msg": f"Property ID: {pid}"})
@@ -583,20 +582,25 @@ def run_job(job_id, prop, platforms, raw_image_paths):
         JOBS[job_id]["watermarked"] = watermarked
 
         # Post to each platform in parallel
+        # Airtable runs fire-and-forget — image uploads are slow and shouldn't
+        # block PP Nigeria / PropertyPro / NPC from completing first.
         import concurrent.futures
-        total = len(platforms)
+
+        main_platforms     = [p for p in platforms if p != "airtable"]
+        airtable_selected  = "airtable" in platforms
+        total = len(main_platforms) + (1 if airtable_selected else 0)
         done  = 0
 
         def post_one(platform):
             poster = PLATFORM_POSTERS[platform]
             creds  = CREDENTIALS[platform]
             emit(q, "log", {"msg": f"  [{PLATFORM_LABELS[platform]}] posting…"})
-            # Airtable gets originals — watermark is already on the Framer frame
             imgs = enhanced if platform == "airtable" else watermarked
             return platform, poster(prop, imgs, creds)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=total) as ex:
-            futures = {ex.submit(post_one, p): p for p in platforms}
+        # Step 1 — post to PP Nigeria, PropertyPro, NPC (fast)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(len(main_platforms), 1)) as ex:
+            futures = {ex.submit(post_one, p): p for p in main_platforms}
             for fut in concurrent.futures.as_completed(futures):
                 platform, result = fut.result()
                 done += 1
@@ -611,7 +615,29 @@ def run_job(job_id, prop, platforms, raw_image_paths):
                     "progress": round(done / total * 100),
                 })
 
-        emit(q, "done", {"msg": "All done!"})
+        # Step 2 — main platforms done
+        if airtable_selected:
+            # Show success banner but keep stream open for Airtable result
+            emit(q, "partial_done", {"msg": "Posted ✓ — Airtable uploading images…"})
+        else:
+            emit(q, "done", {"msg": "All done!"})
+
+        # Step 3 — Airtable in background, sends its result then closes stream
+        if airtable_selected:
+            def _airtable_bg():
+                platform, result = post_one("airtable")
+                emit(q, "result", {
+                    "ref":      pid,
+                    "platform": platform,
+                    "label":    PLATFORM_LABELS[platform],
+                    "success":  result.get("success", False),
+                    "url":      result.get("listing_url", ""),
+                    "images":   result.get("images_uploaded", 0),
+                    "error":    result.get("error", ""),
+                    "progress": 100,
+                })
+                emit(q, "done", {"msg": "All done!"})
+            threading.Thread(target=_airtable_bg, daemon=True).start()
 
     except Exception as e:
         emit(q, "error", {"msg": str(e)})
