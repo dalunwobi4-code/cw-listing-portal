@@ -28,11 +28,31 @@ LISTING_STATUS = {
 }
 
 NEIGHBORHOOD_IDS = {
-    "Lekki Phase 1": "recwrX2yZpHmCybue",
-    "Lekki":         "recT8VY2sQLAl7y7n",
-    "Chevron Drive": "rec48OBZc2uKHgg1Z",
-    "Victoria Island": "recZ4mpm64vHO4PHx",
-    "Ikoyi":         "recJDjo6ORlluSgGF",
+    "Lekki Phase 1":        "recwrX2yZpHmCybue",
+    "Lekki Phase 2":        "recwrX2yZpHmCybue",
+    "Lekki":                "recT8VY2sQLAl7y7n",
+    "Lekki County":         "recMDDc8wiLfkrKnt",
+    "Chevron Drive":        "rec48OBZc2uKHgg1Z",
+    "Chevron":              "rec48OBZc2uKHgg1Z",
+    "Victoria Island":      "recZ4mpm64vHO4PHx",
+    "VI":                   "recZ4mpm64vHO4PHx",
+    "Ikoyi":                "recJDjo6ORlluSgGF",
+    "Old Ikoyi":            "recoPY8FRH1yqZMFT",
+    "Banana Island":        "recMUwbzSgptn62kj",
+    "Oniru":                "rec68VZjgRIlm8dZL",
+    "Osapa":                "recU90YcEpR54OX6F",
+    "Osapa London":         "recU90YcEpR54OX6F",
+    "Ajah":                 "rec8XkaIjGEu0rhnU",
+    "Idado":                "recuvyNB8xxah6d80",
+    "Ikate":                "recW3DBzhEWIew3WY",
+    "Ikota":                "recWCS3xSYCJOiywH",
+    "Orchid":               "recpLFPtcamHCrqmo",
+    "VGC":                  "rec1DytYCRGTFp3Ay",
+    "Eko Atlantic":         "recrCU6M08lPNNhZc",
+    "Parkview":             "rece6w4Q6PYbLELZO",
+    "Osborne Foreshore":    "recqXZPzIQjVxV1wF",
+    "Pinnock Beach Estate": "recaEzrHsHPn5QXUp",
+    "Ologolo":              "recvttIUZUwc6USpo",
 }
 
 BEDROOM_IDS = {

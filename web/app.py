@@ -625,25 +625,32 @@ def run_job(job_id, prop, platforms, raw_image_paths):
         # Step 3 — Airtable in background, sends its result then closes stream
         if airtable_selected:
             def _airtable_bg():
-                platform, result = post_one("airtable")
-                emit(q, "result", {
-                    "ref":      pid,
-                    "platform": platform,
-                    "label":    PLATFORM_LABELS[platform],
-                    "success":  result.get("success", False),
-                    "url":      result.get("listing_url", ""),
-                    "images":   result.get("images_uploaded", 0),
-                    "error":    result.get("error", ""),
-                    "progress": 100,
-                })
-                emit(q, "done", {"msg": "All done!"})
+                try:
+                    platform, result = post_one("airtable")
+                    emit(q, "result", {
+                        "ref":      pid,
+                        "platform": platform,
+                        "label":    PLATFORM_LABELS[platform],
+                        "success":  result.get("success", False),
+                        "url":      result.get("listing_url", ""),
+                        "images":   result.get("images_uploaded", 0),
+                        "error":    result.get("error", ""),
+                        "progress": 100,
+                    })
+                    emit(q, "done", {"msg": "All done!"})
+                except Exception as e:
+                    emit(q, "error", {"msg": f"Airtable: {e}"})
+                finally:
+                    JOBS[job_id]["done"] = True
+                    q.put(None)  # close the stream from background thread
             threading.Thread(target=_airtable_bg, daemon=True).start()
 
     except Exception as e:
         emit(q, "error", {"msg": str(e)})
     finally:
         JOBS[job_id]["done"] = True
-        q.put(None)
+        if not airtable_selected:
+            q.put(None)  # only close stream here if Airtable isn't running in background
 
 
 # ── routes ───────────────────────────────────────────────────────────────────
