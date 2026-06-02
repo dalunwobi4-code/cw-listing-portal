@@ -364,7 +364,7 @@ _BUILD_KEYWORDS = {"pool", "elevator", "lift", "generator", "cctv", "gym", "park
                    "concierge", "reception", "lobby"}
 
 
-def _categorise(bullets: list) -> tuple[list, list]:
+def _categorise(bullets: list):
     """Split feature bullets into unit-level and building/shared amenities."""
     unit, building = [], []
     for b in bullets:

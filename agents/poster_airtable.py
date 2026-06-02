@@ -97,7 +97,7 @@ IMAGE_SLOT_ORDER = [
 ]
 
 
-def find_record(token: str, ref: str) -> dict | None:
+def find_record(token: str, ref: str):
     """Find the Airtable record by Property ID (e.g. CW08494)."""
     r = requests.get(
         f"{API}/{BASE_ID}/{TABLE}",
