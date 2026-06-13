@@ -1,5 +1,4 @@
-# Credentials — NEVER commit these
-orchestrate.py
+# Credentials
 *.env
 .env*
 
