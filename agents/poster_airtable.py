@@ -27,32 +27,54 @@ LISTING_STATUS = {
     "short-let": "rec9cXDBpwqq6URo6",   # For Rent (closest match)
 }
 
-NEIGHBORHOOD_IDS = {
-    "Lekki Phase 1":        "recwrX2yZpHmCybue",
-    "Lekki Phase 2":        "recwrX2yZpHmCybue",
-    "Lekki":                "recT8VY2sQLAl7y7n",
-    "Lekki County":         "recMDDc8wiLfkrKnt",
-    "Chevron Drive":        "rec48OBZc2uKHgg1Z",
-    "Chevron":              "rec48OBZc2uKHgg1Z",
-    "Victoria Island":      "recZ4mpm64vHO4PHx",
-    "VI":                   "recZ4mpm64vHO4PHx",
-    "Ikoyi":                "recJDjo6ORlluSgGF",
-    "Old Ikoyi":            "recoPY8FRH1yqZMFT",
-    "Banana Island":        "recMUwbzSgptn62kj",
-    "Oniru":                "rec68VZjgRIlm8dZL",
-    "Osapa":                "recU90YcEpR54OX6F",
-    "Osapa London":         "recU90YcEpR54OX6F",
-    "Ajah":                 "rec8XkaIjGEu0rhnU",
-    "Idado":                "recuvyNB8xxah6d80",
-    "Ikate":                "recW3DBzhEWIew3WY",
-    "Ikota":                "recWCS3xSYCJOiywH",
-    "Orchid":               "recpLFPtcamHCrqmo",
-    "VGC":                  "rec1DytYCRGTFp3Ay",
-    "Eko Atlantic":         "recrCU6M08lPNNhZc",
-    "Parkview":             "rece6w4Q6PYbLELZO",
-    "Osborne Foreshore":    "recqXZPzIQjVxV1wF",
-    "Pinnock Beach Estate": "recaEzrHsHPn5QXUp",
-    "Ologolo":              "recvttIUZUwc6USpo",
+# Main neighborhoods (Neigborhoods table) — used when location is itself a main area
+MAIN_NEIGHBORHOOD_IDS = {
+    "lekki phase 1":   "recwrX2yZpHmCybue",
+    "lekki phase 2":   "recwrX2yZpHmCybue",
+    "lekki":           "recT8VY2sQLAl7y7n",
+    "victoria island": "recZ4mpm64vHO4PHx",
+    "vi":              "recZ4mpm64vHO4PHx",
+    "ikoyi":           "recJDjo6ORlluSgGF",
+}
+
+# Sub neighborhoods → (sub_record_id, main_neighborhood_record_id)
+SUB_NEIGHBORHOOD_IDS = {
+    "ikate":                ("rec1IsdwSRZyWyAUD", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "parkview":             ("rec4QybAeVcGEAePi", "recJDjo6ORlluSgGF"),   # → Ikoyi
+    "lekki county":         ("rec7pcB1iRI3yMW5p", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "osapa":                ("rec7t6UsFE3krtlBv", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "osapa london":         ("rec7t6UsFE3krtlBv", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "ikota":                ("recAbb59JTidMqHZr", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "vgc":                  ("recCBk1ATmNAxdT6H", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "victoria garden city": ("recCBk1ATmNAxdT6H", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "hampton bay estate":   ("recFlO6ZtNY2c7zgv", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "victory park estate":  ("recGAyX2GepOdCBaF", None),
+    "orchid":               ("recGtPOsSQYQEgo4C", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "orchid road":          ("recGtPOsSQYQEgo4C", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "old ikoyi":            ("recJ5dVS8J5FkLVjO", "recJDjo6ORlluSgGF"),   # → Ikoyi
+    "harris drive":         ("recMMFpWN346d6Oj5", None),
+    "pinnock beach estate": ("recPZraq4OYZ9BBja", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "osborne foreshore":    ("recUOpJ59cJmpnnbo", "recJDjo6ORlluSgGF"),   # → Ikoyi
+    "lekki phase 1":        ("recUUyTsrOzxMBcyE", "recwrX2yZpHmCybue"),   # → Lekki Phase 1
+    "lekki phase 2":        ("recUUyTsrOzxMBcyE", "recwrX2yZpHmCybue"),   # → Lekki Phase 1
+    "ilasan":               ("recVhmlJKHXwLxi8N", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "oral estate":          ("recWTeuhOsmeK392c", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "adeola odeku":         ("recWd0bWRYBa4rqZX", "recZ4mpm64vHO4PHx"),   # → VI
+    "eko atlantic":         ("recegA3s192DyEuxQ", "recZ4mpm64vHO4PHx"),   # → VI
+    "admiralty way":        ("recgoMnNJqqFOSbPF", "recwrX2yZpHmCybue"),   # → Lekki Phase 1
+    "ajah":                 ("reciQB5ZOiZDQ1hci", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "chevron":              ("reclH3Dc06ZZLnCYE", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "chevron drive":        ("reclH3Dc06ZZLnCYE", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "oniru":                ("reclT5ncEt87XLMCi", "recZ4mpm64vHO4PHx"),   # → VI
+    "ologolo":              ("reclv3WYVQE7J27Xh", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "banana island":        ("recmsira6KmKD3xps", "recJDjo6ORlluSgGF"),   # → Ikoyi
+    "beach resort estate":  ("recn8Mj08RUmvRVmD", None),
+    "ibeju lekki":          ("recodbyk4ibspETA0", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "cowrie creek estate":  ("recqM1JVV6s9Skvij", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "victoria crest estate":("recr2E3i8YITLHM51", None),
+    "idado":                ("recsJ2v7Dj85MW4dv", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "sangotedo":            ("recwt5m9BZddbINgk", "recT8VY2sQLAl7y7n"),   # → Lekki
+    "freedom way":          ("recxvaekY8SMo7TAZ", "recwrX2yZpHmCybue"),   # → Lekki Phase 1
 }
 
 BEDROOM_IDS = {
@@ -112,6 +134,21 @@ def find_record(token: str, ref: str):
     return records[0] if records else None
 
 
+def _bedroom_range(bedrooms: int) -> str:
+    if bedrooms <= 2:   return "1-2 Bedrooms"
+    if bedrooms <= 5:   return "3-5 Bedrooms"
+    if bedrooms <= 10:  return "6-10 Bedrooms"
+    return "11+ Bedrooms"
+
+
+def _price_range(price: int) -> str:
+    if price < 50_000_000:    return "Under ₦50M"
+    if price < 200_000_000:   return "₦50M – ₦200M"
+    if price < 500_000_000:   return "₦200M – ₦500M"
+    if price < 1_000_000_000: return "₦500M – ₦1B"
+    return "Above ₦1B"
+
+
 def create_record(token: str, prop: dict) -> str:
     """Create a new Airtable record for this property. Returns record_id."""
     price     = prop.get("price", 0)
@@ -120,6 +157,7 @@ def create_record(token: str, prop: dict) -> str:
     location  = prop.get("location", "")
     bedrooms  = prop.get("bedrooms", 0)
     ptype     = prop.get("property_type", "")
+    loc_lower = location.lower()
 
     fields = {
         "Property ID":    prop.get("ref", ""),
@@ -133,15 +171,31 @@ def create_record(token: str, prop: dict) -> str:
     if status_id:
         fields["Listing Status"] = [status_id]
 
-    # Main Neighborhood (linked record)
-    neigh_id = NEIGHBORHOOD_IDS.get(location)
-    if neigh_id:
-        fields["Main Neighborhood"] = [neigh_id]
+    # Neighborhood: check sub-neighborhoods first, then main neighborhoods
+    sub_info = SUB_NEIGHBORHOOD_IDS.get(loc_lower)
+    if sub_info:
+        sub_id, main_id = sub_info
+        if sub_id:
+            fields["Sub Neighborhood"] = [sub_id]
+        if main_id:
+            fields["Main Neighborhood"] = [main_id]
+    else:
+        main_id = MAIN_NEIGHBORHOOD_IDS.get(loc_lower)
+        if main_id:
+            fields["Main Neighborhood"] = [main_id]
 
     # Bedroom (linked record)
     bed_id = BEDROOM_IDS.get(int(bedrooms) if bedrooms else 0)
     if bed_id:
         fields["Bedroom"] = [bed_id]
+
+    # Bedroom Range (singleSelect)
+    if bedrooms:
+        fields["Bedroom Range"] = _bedroom_range(int(bedrooms))
+
+    # Price Range (singleSelect)
+    if price:
+        fields["Price Range"] = _price_range(int(price))
 
     # Property Type (singleSelect)
     airtable_type = PROPERTY_TYPE_MAP.get(ptype)
@@ -152,6 +206,16 @@ def create_record(token: str, prop: dict) -> str:
     agent_id = prop.get("agent_id")
     if agent_id:
         fields["Agent"] = [agent_id]
+
+    # Contact number
+    contact = prop.get("contact", "")
+    if contact:
+        fields["Contact"] = contact
+
+    # Coordinates / Pinpoint
+    coordinates = prop.get("coordinates", "")
+    if coordinates:
+        fields["Pinpoint"] = coordinates
 
     r = requests.post(
         f"{API}/{BASE_ID}/{TABLE}",

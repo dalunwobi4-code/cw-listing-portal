@@ -332,6 +332,22 @@ def parse_description(text: str) -> dict:
     }
     description = build_formatted_description(prop_stub, raw_bullets, raw_text=text)
 
+    # ── contact number ───────────────────────────────────────────────────
+    contact = ""
+    cm = re.search(r'(?:contact|call|tel|phone|whatsapp)[:\s]+(\+?[\d\s\-]{10,15})', text, re.IGNORECASE)
+    if cm:
+        contact = re.sub(r'\s+', '', cm.group(1)).strip()
+    else:
+        cm2 = re.search(r'(?<!\d)(\+?234[789]\d{8}|0[789]\d{9})(?!\d)', text)
+        if cm2:
+            contact = cm2.group(1).strip()
+
+    # ── coordinates ──────────────────────────────────────────────────────
+    coordinates = ""
+    coord_m = re.search(r'(\d+\.\d+)\s*°?\s*N[,\s]+(\d+\.\d+)\s*°?\s*E', text, re.IGNORECASE)
+    if coord_m:
+        coordinates = f"{coord_m.group(1)}° N, {coord_m.group(2)}° E"
+
     return {
         "title":         title,
         "mode":          mode,
@@ -344,6 +360,8 @@ def parse_description(text: str) -> dict:
         "street":        street,
         "description":   description,
         "features":      features,
+        "contact":       contact,
+        "coordinates":   coordinates,
     }
 
 
