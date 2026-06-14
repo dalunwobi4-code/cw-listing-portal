@@ -22,11 +22,53 @@ _login_lock = threading.Lock()
 BASE_URL = "https://privateproperty.ng"
 
 AREA_CODES = {
-    "Lekki Phase 1": {"area": "33", "axis": "6", "state": "5"},
-    "Chevron Drive":  {"area": "114","axis": "6", "state": "5"},
-    "Lekki":          {"area": "33", "axis": "6", "state": "5"},
-    "Victoria Island": {"area": "36","axis": "4", "state": "5"},
-    "Ikoyi":          {"area": "34", "axis": "4", "state": "5"},
+    # ── Lekki (axis 6) ───────────────────────────────────────────────────────
+    "Lekki":             {"area": "33",       "axis": "6",   "state": "5"},
+    "Lekki Phase 1":     {"area": "33",       "axis": "6",   "state": "5"},
+    "Lekki Phase 2":     {"area": "417",      "axis": "6",   "state": "5"},
+    "Chevron":           {"area": "114",      "axis": "6",   "state": "5"},
+    "Chevron Drive":     {"area": "114",      "axis": "6",   "state": "5"},
+    "Agungi":            {"area": "162",      "axis": "6",   "state": "5"},
+    "Idado":             {"area": "3005",     "axis": "6",   "state": "5"},
+    "Igbo Efon":         {"area": "20566",    "axis": "6",   "state": "5"},
+    "Ikate":             {"area": "599",      "axis": "6",   "state": "5"},
+    "Ikate Elegushi":    {"area": "599",      "axis": "6",   "state": "5"},
+    "Ikota":             {"area": "7",        "axis": "6",   "state": "5"},
+    "Ilasan":            {"area": "11571209", "axis": "6",   "state": "5"},
+    "Jakande":           {"area": "5397",     "axis": "6",   "state": "5"},
+    "Lafiaji":           {"area": "3213",     "axis": "6",   "state": "5"},
+    "Lekki Expressway":  {"area": "515",      "axis": "6",   "state": "5"},
+    "Orchid":            {"area": "515",      "axis": "6",   "state": "5"},
+    "Orchid Road":       {"area": "515",      "axis": "6",   "state": "5"},
+    "Nicon Town":        {"area": "11571222", "axis": "6",   "state": "5"},
+    "Ologolo":           {"area": "2258",     "axis": "6",   "state": "5"},
+    "Oral Estate":       {"area": "11571225", "axis": "6",   "state": "5"},
+    "Osapa":             {"area": "106",      "axis": "6",   "state": "5"},
+    "Osapa London":      {"area": "11571252", "axis": "6",   "state": "5"},
+    "VGC":               {"area": "390",      "axis": "6",   "state": "5"},
+    "Victoria Garden City": {"area": "390",   "axis": "6",   "state": "5"},
+    # ── Ajah (axis 62) ───────────────────────────────────────────────────────
+    "Ajah":              {"area": "63",       "axis": "62",  "state": "5"},
+    "Sangotedo":         {"area": "221",      "axis": "62",  "state": "5"},
+    "Abraham Adesanya":  {"area": "2164",     "axis": "62",  "state": "5"},
+    "Awoyaya":           {"area": "1925",     "axis": "62",  "state": "5"},
+    "Thomas Estate":     {"area": "2230",     "axis": "62",  "state": "5"},
+    "Badore":            {"area": "8760",     "axis": "62",  "state": "5"},
+    "Abijo":             {"area": "1701",     "axis": "62",  "state": "5"},
+    "Lakowe":            {"area": "11568799", "axis": "62",  "state": "5"},
+    # ── Ikoyi (axis 491) ─────────────────────────────────────────────────────
+    "Ikoyi":             {"area": "993",      "axis": "491", "state": "5"},
+    "Old Ikoyi":         {"area": "11570822", "axis": "491", "state": "5"},
+    "Banana Island":     {"area": "492",      "axis": "491", "state": "5"},
+    "Osborne Foreshore": {"area": "11570825", "axis": "491", "state": "5"},
+    "Parkview":          {"area": "3201",     "axis": "491", "state": "5"},
+    "Falomo":            {"area": "65902",    "axis": "491", "state": "5"},
+    # ── Victoria Island (axis 11) ─────────────────────────────────────────────
+    "Victoria Island":   {"area": "12",       "axis": "11",  "state": "5"},
+    "VI":                {"area": "12",       "axis": "11",  "state": "5"},
+    "Eko Atlantic":      {"area": "11572076", "axis": "11",  "state": "5"},
+    "Oniru":             {"area": "574",      "axis": "11",  "state": "5"},
+    "Adeola Odeku":      {"area": "11572021", "axis": "11",  "state": "5"},
 }
 
 TYPE_CODES = {

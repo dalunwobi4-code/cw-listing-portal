@@ -614,7 +614,12 @@ def run_job(job_id, prop, platforms, raw_image_paths):
             creds  = CREDENTIALS[platform]
             emit(q, "log", {"msg": f"  [{PLATFORM_LABELS[platform]}] posting…"})
             imgs = enhanced if platform == "airtable" else watermarked
-            return platform, poster(prop, imgs, creds)
+            if platform != "airtable":
+                p = dict(prop)
+                p["description"] = f"{pid}\n{prop.get('description', '')}"
+            else:
+                p = prop
+            return platform, poster(p, imgs, creds)
 
         # Step 1 — post to PP Nigeria, PropertyPro, NPC (fast)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(len(main_platforms), 1)) as ex:
