@@ -264,7 +264,7 @@ def post_property(prop: dict, image_paths: list, credentials: dict) -> dict:
             result["images_uploaded"] = count
 
         result["success"] = True
-        result["listing_url"] = get_public_url(session, property_id) or f"{BASE_URL}/property/{property_id}"
+        result["listing_url"] = f"{BASE_URL}/account/my-properties"
         print(f"[PPNG] ✓ {prop.get('ref')} → ID {property_id} | {count} images | {result['listing_url']}")
 
     except Exception as e:

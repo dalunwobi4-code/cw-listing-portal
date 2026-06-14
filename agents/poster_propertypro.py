@@ -151,7 +151,7 @@ def upload_images(session, property_id: str, edit_url: str, uuid: str,
     uploaded = 0
     for i, img_path in enumerate(image_paths):
         name = os.path.basename(img_path)
-        for attempt in range(4):
+        for attempt in range(2):
             try:
                 with open(img_path, "rb") as f:
                     resp = session.post(
@@ -171,14 +171,14 @@ def upload_images(session, property_id: str, edit_url: str, uuid: str,
                             "X-Requested-With": "XMLHttpRequest",
                             "Referer": edit_url
                         },
-                        timeout=60
+                        timeout=20
                     )
                 if resp.status_code == 200:
                     uploaded += 1
                     break
             except Exception as e:
-                if attempt < 3:
-                    time.sleep(2)
+                if attempt < 1:
+                    time.sleep(1)
         time.sleep(0.5)
 
     # Save images
@@ -242,7 +242,7 @@ def post_property(prop: dict, image_paths: list, credentials: dict) -> dict:
                 result["images_uploaded"] = count
 
             result["success"] = True
-            result["listing_url"] = get_public_url(session, property_id) or f"{BASE_URL}/listing/{property_id}"
+            result["listing_url"] = f"{BASE_URL}/property-edit/{property_id}"
             print(f"[PROPERTYPRO] ✓ {prop.get('ref')} → ID {property_id} | {result.get('images_uploaded', 0)} images | {result['listing_url']}")
             break  # success — exit retry loop
 
