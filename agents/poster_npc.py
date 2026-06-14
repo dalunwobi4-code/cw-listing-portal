@@ -67,11 +67,17 @@ LOCATION_CODES = {
 }
 
 TYPE_CODES = {
-    "Flat":         {"cid": "2", "tid": "1"},  # For Sale, Flat/Apartment
-    "Apartment":    {"cid": "2", "tid": "1"},
-    "House":        {"cid": "2", "tid": "2"},
-    "Land":         {"cid": "2", "tid": "5"},
-    "Commercial":   {"cid": "2", "tid": "3"},
+    # ── Flat / Apartment (tid=1) ──────────────────────────────────────────────
+    "Flat":                  {"tid": "1", "stid": ""},
+    "Apartment":             {"tid": "1", "stid": ""},
+    "Studio":                {"tid": "1", "stid": ""},
+    # ── House / Duplex / Bungalow (tid=2) ────────────────────────────────────
+    "House":                 {"tid": "2", "stid": ""},
+    "Duplex":                {"tid": "2", "stid": ""},
+    "Detached Duplex":       {"tid": "2", "stid": ""},
+    "Semi-detached Duplex":  {"tid": "2", "stid": ""},
+    "Terraced Duplex":       {"tid": "2", "stid": ""},
+    "Bungalow":              {"tid": "2", "stid": ""},
 }
 
 MODE_MAP = {
@@ -122,7 +128,10 @@ def create_listing(session, prop: dict) -> tuple:
                                    LOCATION_CODES["Lekki Phase 1"])
     mode = prop.get("mode", "sale")
     cid = MODE_MAP.get(mode, "2")
-    ptype = TYPE_CODES.get(prop.get("property_type", "Flat"), TYPE_CODES["Flat"])
+    ptype = TYPE_CODES.get(prop.get("property_type", "Flat"),
+                           TYPE_CODES.get("House", {"tid": "2", "stid": ""})
+                           if any(w in prop.get("property_type", "") for w in ("Duplex", "Bungalow", "House"))
+                           else TYPE_CODES["Flat"])
 
     data = {
         "_token": token,
@@ -137,7 +146,7 @@ def create_listing(session, prop: dict) -> tuple:
         "available": "0",
         "cid": cid,
         "tid": ptype["tid"],
-        "stid": prop.get("stid", ""),
+        "stid": ptype.get("stid", ""),
         "sid": location["sid"],
         "lid": location["lid"],
         "slid": location["slid"],
