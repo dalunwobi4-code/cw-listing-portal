@@ -552,6 +552,7 @@ def emit(q, event_type, data):
 
 def run_job(job_id, prop, platforms, raw_image_paths):
     q = JOBS[job_id]["events"]
+    airtable_selected = False
     try:
         emit(q, "log", {"msg": f"Getting next Property ID from Airtable…"})
         with _PID_LOCK:
@@ -734,7 +735,7 @@ def start_job():
     if img_dir.exists():
         raw_paths = sorted([
             str(p) for p in img_dir.iterdir()
-            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif")
         ])
 
     job_id = str(uuid.uuid4())[:8]

@@ -24,8 +24,8 @@ BASE_URL = "https://nigeriapropertycentre.com"
 LOCATION_CODES = {
     "Lekki Phase 1": {"sid": "2", "lid": "3", "slid": "669",
                       "propertyLocation": "Lekki Phase 1, Lekki, Lagos"},
-    "Lekki Phase 2": {"sid": "2", "lid": "3", "slid": "669",
-                      "propertyLocation": "Lekki Phase 1, Lekki, Lagos"},
+    "Lekki Phase 2": {"sid": "2", "lid": "3", "slid": "",
+                      "propertyLocation": "Lekki Phase 2, Lekki, Lagos"},
     "Victoria Island": {"sid": "2", "lid": "2", "slid": "",
                         "propertyLocation": "Victoria Island (VI), Lagos"},
     "VI":              {"sid": "2", "lid": "2", "slid": "",
@@ -84,6 +84,7 @@ MODE_MAP = {
     "sale":      "2",  # For Sale
     "rent":      "1",  # For Rent
     "short_let": "4",  # Short Let
+    "short-let": "4",  # Short Let (hyphen variant from parser)
 }
 
 

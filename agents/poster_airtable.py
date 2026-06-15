@@ -92,9 +92,12 @@ BEDROOM_IDS = {
 PROPERTY_TYPE_MAP = {
     "Apartment":            "Apartment",
     "Flat":                 "Apartment",
+    "Studio":               "Apartment",
     "Semi-detached Duplex": "Semi Detached",
     "Terraced Duplex":      "Terrace",
     "Detached Duplex":      "Detached Duplex",
+    "Duplex":               "Detached Duplex",
+    "Bungalow":             "Detached Duplex",
     "House":                "Detached Duplex",
     "Penthouse":            "Penthouse",
 }
@@ -283,7 +286,7 @@ def upload_attachment(token: str, record_id: str, field_id: str, image_path: str
             "Content-Type": "application/json"
         },
         json={
-            "contentType": "image/jpeg",
+            "contentType": "image/png" if image_path.lower().endswith(".png") else "image/jpeg",
             "filename": filename,
             "file": b64
         },

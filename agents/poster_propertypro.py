@@ -43,9 +43,12 @@ AREA_CODES = {
 TYPE_CODES = {
     "Flat":                  {"type": "6",  "stype": ""},
     "Apartment":             {"type": "6",  "stype": ""},
+    "Studio":                {"type": "6",  "stype": ""},
     "Semi-detached Duplex":  {"type": "13", "stype": "7"},
     "Terraced Duplex":       {"type": "13", "stype": "8"},
     "Detached Duplex":       {"type": "13", "stype": "9"},
+    "Duplex":                {"type": "13", "stype": ""},
+    "Bungalow":              {"type": "13", "stype": ""},
     "House":                 {"type": "13", "stype": ""},
 }
 
@@ -57,6 +60,8 @@ FEATURE_CODES = {
     "Generator":         "feat[27]",
     "Boys Quarter":      "feat[4]",
     "Elevator":          "feat[19]",
+    "CCTV":              "feat[70]",
+    "Intercom":          "feat[57]",
 }
 
 
@@ -109,7 +114,7 @@ def create_listing(session, prop: dict) -> tuple:
         "stype": ptype["stype"],
         "price": str(prop.get("price", 0)),
         "priceCurrency": "NAIRA",
-        "appendTo": (prop.get("appendTo") or "YEAR") if prop.get("mode") in ("rent", "short_let") else "",
+        "appendTo": (prop.get("appendTo") or "YEAR") if prop.get("mode") in ("rent", "short_let", "short-let") else "",
         "bedroom": str(prop.get("bedrooms", 2)),
         "bathroom": str(prop.get("bathrooms", 2)),
         "toilet": str(prop.get("toilets", prop.get("bathrooms", 2))),

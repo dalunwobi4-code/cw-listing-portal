@@ -74,9 +74,12 @@ AREA_CODES = {
 TYPE_CODES = {
     "Flat":                  {"type": "214", "stype": ""},
     "Apartment":             {"type": "214", "stype": ""},
+    "Studio":                {"type": "214", "stype": ""},
     "Semi-detached Duplex":  {"type": "3",   "stype": "16981000"},
     "Terraced Duplex":       {"type": "3",   "stype": "16981001"},
     "Detached Duplex":       {"type": "3",   "stype": "16981003"},
+    "Duplex":                {"type": "3",   "stype": ""},
+    "Bungalow":              {"type": "3",   "stype": ""},
     "House":                 {"type": "3",   "stype": ""},
 }
 
