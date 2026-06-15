@@ -7,6 +7,12 @@ import os, sys
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
+
 
 def apply_watermark(source_path: str, dest_path: str, logo_path: str = None, opacity: float = 1.0):
     """Apply CW watermark to a single image.
@@ -69,7 +75,7 @@ def watermark_property_folder(source_dir: str, dest_dir: str, logo_path: str = N
 
     output_paths = []
     images = sorted([f for f in source_dir.iterdir()
-                     if f.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp')])
+                     if f.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif')])
 
     for i, img_path in enumerate(images):
         dest_path = dest_dir / f"img{i+1:02d}.jpg"
