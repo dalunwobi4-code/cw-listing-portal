@@ -800,7 +800,14 @@ def retry_platform():
     try:
         poster = PLATFORM_POSTERS[platform]
         creds  = CREDENTIALS[platform]
-        result = poster(prop, watermarked, creds)
+        # Prepend PID to description — same as main post flow
+        p = dict(prop)
+        if platform != "airtable":
+            pid_val = prop.get("ref", "")
+            orig_desc = prop.get("description", "") or ""
+            if pid_val and not orig_desc.startswith(pid_val):
+                p["description"] = f"{pid_val}\n{orig_desc}"
+        result = poster(p, watermarked, creds)
         return jsonify({
             "platform": platform,
             "label":    PLATFORM_LABELS[platform],
