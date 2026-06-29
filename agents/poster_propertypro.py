@@ -140,12 +140,18 @@ def create_listing(session, prop: dict) -> tuple:
     property_id = match.group(1)
     edit_url = f"{BASE_URL}/property-edit/{property_id}?isnewposting=new-posting"
 
-    # Get UUID from edit page
+    # Get UUID from edit page — try multiple attribute orderings
     r2 = session.get(edit_url)
-    uuid_match = re.search(r'id="uuid"[^>]+value="([^"]+)"', r2.text)
-    if not uuid_match:
-        uuid_match = re.search(r'name="uuid"[^>]+value="([^"]+)"', r2.text)
+    uuid_match = (
+        re.search(r'id="uuid"[^>]+value="([^"]+)"', r2.text) or
+        re.search(r'name="uuid"[^>]+value="([^"]+)"', r2.text) or
+        re.search(r'value="([^"]+)"[^>]+id="uuid"', r2.text) or
+        re.search(r'value="([^"]+)"[^>]+name="uuid"', r2.text) or
+        re.search(r'["\']uuid["\']\s*:\s*["\']([^"\']+)["\']', r2.text)
+    )
     uuid = uuid_match.group(1) if uuid_match else ""
+    if not uuid:
+        print(f"[PROPERTYPRO] WARNING: UUID not found for {property_id} — images will be skipped")
 
     return property_id, edit_url, uuid
 
