@@ -449,7 +449,22 @@ async function submitJob() {
     const fd = new FormData();
     fd.append('session_id', sessionId);
     filesToUpload.forEach(f => fd.append('images', f));
-    await fetch('/upload-images', { method: 'POST', body: fd });
+    try {
+      const upRes = await fetch('/upload-images', { method: 'POST', body: fd });
+      if (!upRes.ok) {
+        const proceed = confirm(`Image upload failed (server returned ${upRes.status}). Post listing without images?`);
+        if (!proceed) { postBtn.disabled = false; postBtn.textContent = 'Post Listing'; return; }
+      } else {
+        const upData = await upRes.json();
+        if (upData.count === 0 && filesToUpload.length > 0) {
+          const proceed = confirm(`Images were not saved on the server (0 received). Post listing without images?`);
+          if (!proceed) { postBtn.disabled = false; postBtn.textContent = 'Post Listing'; return; }
+        }
+      }
+    } catch (upErr) {
+      const proceed = confirm(`Image upload error: ${upErr.message}. Post listing without images?`);
+      if (!proceed) { postBtn.disabled = false; postBtn.textContent = 'Post Listing'; return; }
+    }
   }
 
   // Start job
