@@ -114,8 +114,20 @@ def login(session, email, password):
     raise Exception(f"NPC login failed: {r2.url}")
 
 
+_NPC_NON_RESIDENTIAL = {
+    "Land", "Commercial Property", "Office Space", "Shop",
+    "Warehouse", "Plaza", "Factory", "Event Centre",
+}
+
 def create_listing(session, prop: dict) -> tuple:
     """Create listing. Returns (listing_id, images_url)."""
+    ptype_str = prop.get("property_type", "Flat")
+    if ptype_str in _NPC_NON_RESIDENTIAL:
+        raise Exception(
+            f"NPC does not support commercial listings via API ({ptype_str}). "
+            f"Post manually at nigeriapropertycentre.com"
+        )
+
     r = session.get(f"{BASE_URL}/account/listings/create")
     m = re.search(r'name="_token"\s+value="([^"]+)"', r.text)
     if not m:
@@ -129,9 +141,9 @@ def create_listing(session, prop: dict) -> tuple:
                                    LOCATION_CODES["Lekki Phase 1"])
     mode = prop.get("mode", "sale")
     cid = MODE_MAP.get(mode, "2")
-    ptype = TYPE_CODES.get(prop.get("property_type", "Flat"),
+    ptype = TYPE_CODES.get(ptype_str,
                            TYPE_CODES.get("House", {"tid": "2", "stid": ""})
-                           if any(w in prop.get("property_type", "") for w in ("Duplex", "Bungalow", "House"))
+                           if any(w in ptype_str for w in ("Duplex", "Bungalow", "House"))
                            else TYPE_CODES["Flat"])
 
     data = {
