@@ -155,13 +155,17 @@ PROPERTY_TYPES = [
     "Plaza", "Factory", "Event Centre",
 ]
 
-# Aliases for property type matching (handles WhatsApp shorthand)
+# Aliases for property type matching (handles WhatsApp shorthand + hyphen variants)
+# Order matters: more specific aliases must come before substrings they contain
+# e.g. "semi-detached duplex" must be checked before "detached duplex"
 _PTYPE_ALIASES = {
+    "semi-detached duplex": "Semi-detached Duplex",
     "semi detached duplex": "Semi-detached Duplex",
-    "semi detached": "Semi-detached Duplex",
-    "terrace duplex": "Terraced Duplex",
-    "terraced duplex": "Terraced Duplex",
-    "detached duplex": "Detached Duplex",
+    "semi-detached":        "Semi-detached Duplex",
+    "semi detached":        "Semi-detached Duplex",
+    "terraced duplex":      "Terraced Duplex",
+    "terrace duplex":       "Terraced Duplex",
+    "detached duplex":      "Detached Duplex",
 }
 FEATURE_KEYWORDS = {
     "All Room Ensuite":   ["all room ensuite", "all rooms ensuite", "en-suite", "ensuite"],
@@ -203,7 +207,7 @@ def parse_description(text: str) -> dict:
     # ── mode ──────────────────────────────────────────────────────────────
     if re.search(r"short.?let|shortlet", t_low):
         mode = "short-let"
-    elif re.search(r"\bfor rent\b|\bto let\b|\blet\b", t_low):
+    elif re.search(r"\bfor rent\b|\bto let\b|\brent[:\s]|\bper annum\b|\bp\.a\.\b", t_low):
         mode = "rent"
     else:
         mode = "sale"
@@ -313,7 +317,7 @@ def parse_description(text: str) -> dict:
         )
         for line in lines:
             line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
-            if re.match(r'features?\s*:?$', line, re.IGNORECASE):
+            if re.match(r'(?:property\s+)?features?\s*:?$', line, re.IGNORECASE):
                 in_features = True
                 continue
             if in_features:
@@ -484,21 +488,31 @@ def parse_financials(raw_text: str, price: int) -> list:
     elif rent_match:
         lines.append(f"• Rent: {rent_match.group(1).strip()}")
 
-    # Generic charge patterns: "Label: Value" lines in Other Charges block
+    # Generic charge patterns — match the VALUE after the label (skip redundant label words)
+    # Pattern: label word(s) optionally followed by "fee" then colon/space then value
     charge_patterns = [
-        (r"agency[:\s]+([^\n]+)",          "Agency Fee"),
-        (r"legal[:\s]+([^\n]+)",            "Legal Fee"),
-        (r"caution[:\s]+([^\n]+)",          "Caution"),
-        (r"service\s+charge[:\s]+([^\n]+)", "Service Charge"),
-        (r"total\s+package[:\s]+([^\n]+)",  "Total Package"),
-        (r"agreement[:\s]+([^\n]+)",        "Agreement Fee"),
-        (r"commission[:\s]+([^\n]+)",       "Commission"),
+        (r"agency\s+fee[:\s]+([^\n]+)",           "Agency Fee"),
+        (r"agency[:\s]+(?:fee[:\s]+)?([^\n]+)",   "Agency Fee"),
+        (r"legal\s+fee[:\s]+([^\n]+)",             "Legal Fee"),
+        (r"legal[:\s]+(?:fee[:\s]+)?([^\n]+)",     "Legal Fee"),
+        (r"caution\s+fee[:\s]+([^\n]+)",           "Caution Fee"),
+        (r"caution[:\s]+(?:fee[:\s]+)?([^\n]+)",   "Caution Fee"),
+        (r"service\s+charge[:\s]+([^\n]+)",        "Service Charge"),
+        (r"total\s+package[:\s]+([^\n]*\S[^\n]*)", "Total Package"),
+        (r"agreement\s+fee[:\s]+([^\n]+)",         "Agreement Fee"),
+        (r"agreement[:\s]+([^\n]+)",               "Agreement Fee"),
+        (r"commission[:\s]+([^\n]+)",              "Commission"),
     ]
+    seen_labels = set()
     for pat, label in charge_patterns:
+        if label in seen_labels:
+            continue
         m = re.search(pat, t, re.IGNORECASE)
         if m:
             val = m.group(1).strip().rstrip(",;")
-            lines.append(f"• {label}: {val}")
+            if val:  # skip empty values (e.g. "Total Package:" with nothing after)
+                lines.append(f"• {label}: {val}")
+                seen_labels.add(label)
 
     return lines
 
