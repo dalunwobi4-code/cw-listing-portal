@@ -553,6 +553,7 @@ def build_formatted_description(prop: dict, raw_bullets: list, raw_text: str = "
     """
     price     = prop.get('price', 0)
     loc       = prop.get('location', '')
+    mode      = prop.get('mode', 'rent')
     price_str = f"₦{price:,}" if price else "Price on request"
 
     overview = generate_overview(prop, raw_bullets, raw_text)
