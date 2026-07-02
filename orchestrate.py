@@ -42,8 +42,13 @@ CREDENTIALS = {
         "password": "Listings@1234",
         "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
     },
-    "npc": {
+    "npc_daniel": {
         "email": "daniel@cwlagos.com",
+        "password": "Listings@1234",
+        "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
+    },
+    "npc_cw": {
+        "email": "hello@cwlagos.com",
         "password": "Listings@1234",
         "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
     },

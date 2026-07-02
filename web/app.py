@@ -36,25 +36,24 @@ from agents.poster_airtable    import post_property as post_airtable
 def _get_credentials():
     if os.environ.get("AIRTABLE_TOKEN"):
         return {
-            "ppng":        {"email": os.environ.get("PPNG_EMAIL", ""),        "password": os.environ.get("PPNG_PASSWORD", "")},
-            "propertypro": {"email": os.environ.get("PROPERTYPRO_EMAIL", ""), "password": os.environ.get("PROPERTYPRO_PASSWORD", "")},
-            "npc":         {"email": os.environ.get("NPC_EMAIL", ""),         "password": os.environ.get("NPC_PASSWORD", "")},
+            "ppng":        {"email": os.environ.get("PPNG_EMAIL", ""),             "password": os.environ.get("PPNG_PASSWORD", "")},
+            "propertypro": {"email": os.environ.get("PROPERTYPRO_EMAIL", ""),      "password": os.environ.get("PROPERTYPRO_PASSWORD", "")},
+            "npc_daniel":  {"email": os.environ.get("NPC_DANIEL_EMAIL", ""),       "password": os.environ.get("NPC_DANIEL_PASSWORD", "")},
+            "npc_cw":      {"email": os.environ.get("NPC_CW_EMAIL", ""),           "password": os.environ.get("NPC_CW_PASSWORD", "")},
             "airtable":    {"token": os.environ.get("AIRTABLE_TOKEN", "")},
         }
     try:
         from orchestrate import CREDENTIALS as _C
         return _C
     except ImportError:
-        # No credentials found — app will start but posting will fail
-        return {"ppng": {}, "propertypro": {}, "npc": {}, "airtable": {}}
+        return {"ppng": {}, "propertypro": {}, "npc_daniel": {}, "npc_cw": {}, "airtable": {}}
 
 CREDENTIALS = _get_credentials()
 
-# Optional residential proxy — routes requests to Cloudflare-protected sites
-# Set PROXY_URL=http://user:pass@host:port in Railway env vars (WebShare free tier works)
+# Optional residential proxy
 _PROXY_URL = os.environ.get("PROXY_URL", "")
 if _PROXY_URL:
-    for _p in ("ppng", "propertypro", "npc"):
+    for _p in ("ppng", "propertypro", "npc_daniel", "npc_cw"):
         CREDENTIALS.setdefault(_p, {})["proxy_url"] = _PROXY_URL
 
 import requests as req
@@ -70,12 +69,16 @@ except ImportError:
 PLATFORM_POSTERS = {
     "ppng":        post_ppng,
     "propertypro": post_propertypro,
-    "npc":         post_npc,
+    "npc_daniel":  post_npc,
+    "npc_cw":      post_npc,
     "airtable":    post_airtable,
 }
 PLATFORM_LABELS = {
-    "ppng": "PP Nigeria", "propertypro": "PropertyPro",
-    "npc": "NPC", "airtable": "Airtable",
+    "ppng":        "PP Nigeria",
+    "propertypro": "PropertyPro",
+    "npc_daniel":  "Daniel NPC",
+    "npc_cw":      "CW NPC",
+    "airtable":    "Airtable",
 }
 
 AIRTABLE_BASE_ID = "appui0GIVsqalToEa"
