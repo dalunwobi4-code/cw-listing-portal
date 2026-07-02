@@ -205,12 +205,15 @@ FEATURE_KEYWORDS = {
 
 def parse_price(text: str) -> int:
     """Extract price in Naira from text like ₦18M, ₦18,000,000, 18 million, N18M."""
-    t = text.lower().replace(",", "").replace("₦", "").replace("n", " ").replace("ngn", " ")
+    t = text.replace(",", "").replace("₦", "")
+    t = re.sub(r'\bngn\b', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'(?<!\w)N(?=\d)', ' ', t)  # N as currency prefix before digit (N100 → 100)
+    t = t.lower()
     # Billion
-    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:b(?:illion)?)", t)
+    m = re.search(r"(\d+(?:\.\d+)?)\s*b(?:illion)?\b", t)
     if m: return int(float(m.group(1)) * 1_000_000_000)
     # Million (M or million)
-    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:m(?:illion)?)\b", t)
+    m = re.search(r"(\d+(?:\.\d+)?)\s*m(?:illion)?\b", t)
     if m: return int(float(m.group(1)) * 1_000_000)
     # Thousands (K)
     m = re.search(r"(\d+(?:\.\d+)?)\s*k\b", t)
@@ -300,7 +303,7 @@ def parse_description(text: str) -> dict:
 
     # ── price ─────────────────────────────────────────────────────────────
     price_section = ""
-    pm = re.search(r"price[:\s]+(.{3,50})", t_low)
+    pm = re.search(r"(?:price|land\s+value)[:\s]+(.{3,50})", t_low)
     if pm:
         price_section = pm.group(0)
     else:
@@ -468,23 +471,47 @@ def generate_overview(prop: dict, raw_bullets: list, raw_text: str = "") -> str:
     Generate a 3-5 line SEO-optimised intro using Claude API.
     Falls back to a basic template if Claude is unavailable.
     """
-    beds  = prop.get('bedrooms', '')
-    ptype = prop.get('property_type', 'property')
-    loc   = prop.get('location', '')
-    mode  = prop.get('mode', 'sale')
-    price = prop.get('price', 0)
+    beds     = prop.get('bedrooms', '')
+    ptype    = prop.get('property_type', 'property')
+    loc      = prop.get('location', '')
+    mode     = prop.get('mode', 'sale')
+    price    = prop.get('price', 0)
+    is_land  = prop.get('is_land', False)
+    size_sqm = prop.get('size_sqm', 0)
 
     MODE_PHRASE = {"sale": "for Sale", "rent": "for Rent", "short-let": "for Short Let"}
     mode_str  = MODE_PHRASE.get(mode, "for Sale")
     price_str = f"₦{price:,}" if price else "Price on request"
+    size_str  = f"{size_sqm:,}sqm " if size_sqm else ""
 
     # ── try Claude API ───────────────────────────────────────────────────────
     if _ANTHROPIC_CLIENT:
         try:
-            features_text = "\n".join(f"- {b}" for b in raw_bullets) if raw_bullets else \
-                            "\n".join(f"- {f}" for f in prop.get('features', []))
+            if is_land:
+                land_subtype = prop.get('land_subtype', 'Land')
+                prompt = f"""You are an SEO copywriter for a premium Nigerian real estate agency.
 
-            prompt = f"""You are an SEO copywriter for a premium Nigerian real estate agency.
+Write a SHORT, keyword-rich intro for a land listing on online property portals.
+
+Land Details:
+- Size: {size_str.strip() or 'See listing'}
+- Type: {land_subtype}
+- Location: {loc}, Lagos, Nigeria
+- Price: {price_str}
+- Key Details: {', '.join(raw_bullets) if raw_bullets else '(see listing)'}
+
+Rules:
+1. Write EXACTLY 3 sentences — no more, no less
+2. Sentence 1: hook with size, land type, location, and price
+3. Sentence 2: highlight the opportunity (development potential, title documents, etc.)
+4. Sentence 3: mention location appeal and investment angle
+5. Pack in SEO keywords: "{size_str.strip()} land {loc}", "land for sale Lagos", "{loc} Lagos"
+6. Tone: premium, investment-focused, direct
+7. NO bullet points, NO headers, NO markdown — pure flowing sentences
+8. Do NOT mention any agency name or contact details
+9. Output ONLY the 3 sentences, nothing else"""
+            else:
+                prompt = f"""You are an SEO copywriter for a premium Nigerian real estate agency.
 
 Write a SHORT, keyword-rich property intro for online listing portals.
 
@@ -516,6 +543,12 @@ Rules:
             print(f"[Claude API] SEO description failed: {e}", flush=True)
 
     # ── fallback: basic template ─────────────────────────────────────────────
+    if is_land:
+        land_subtype = prop.get('land_subtype', 'Land')
+        s1 = f"Prime {size_str}{land_subtype.lower()} for sale in {loc}, Lagos."
+        s2 = f"Excellent development opportunity with strong title documentation." if raw_bullets else ""
+        return " ".join(s for s in [s1, s2] if s)
+
     all_feats = raw_bullets if raw_bullets else prop.get('features', [])
     unit_feats, build_feats = _categorise(all_feats) if all_feats else ([], [])
 
@@ -533,14 +566,13 @@ def parse_financials(raw_text: str, price: int, mode: str = "rent") -> list:
     lines = []
     t = raw_text or ""
 
-    # Rent / Price
+    # Rent / Price / Land Value
     rent_match = re.search(
-        r"(?:rent|price)[:\s]+([₦N]?\s*[\d,\.]+(?:\s*(?:million|m|k))?"
+        r"(?:rent|price|land\s+value)[:\s]+([₦N]?\s*[\d,\.]+(?:\s*(?:million|billion|m|b|k))?"
         r"(?:\s*per\s+(?:annum|year|month|day))?[^\n]*)",
         t, re.IGNORECASE
     )
     if price:
-        # Use the structured price + any "per annum" suffix from raw text
         suffix = ""
         if rent_match:
             raw_val = rent_match.group(1).strip()
@@ -556,8 +588,11 @@ def parse_financials(raw_text: str, price: int, mode: str = "rent") -> list:
     # Generic charge patterns — match the VALUE after the label (skip redundant label words)
     # Pattern: label word(s) optionally followed by "fee" then colon/space then value
     charge_patterns = [
-        (r"agency\s+fee[:\s]+([^\n]+)",           "Agency Fee"),
-        (r"agency[:\s]+(?:fee[:\s]+)?([^\n]+)",   "Agency Fee"),
+        (r"land\s+value[:\s]+([^\n]+)",            "Land Value"),
+        (r"premium[:\s]+([^\n]+)",                 "Premium"),
+        (r"facilitator['’]?s?\s+fee[:\s]+([^\n]+)", "Facilitator's Fee"),
+        (r"agency\s+fee[:\s]+([^\n]+)",            "Agency Fee"),
+        (r"agency[:\s]+(?:fee[:\s]+)?([^\n]+)",    "Agency Fee"),
         (r"legal\s+fee[:\s]+([^\n]+)",             "Legal Fee"),
         (r"legal[:\s]+(?:fee[:\s]+)?([^\n]+)",     "Legal Fee"),
         (r"caution\s+fee[:\s]+([^\n]+)",           "Caution Fee"),
