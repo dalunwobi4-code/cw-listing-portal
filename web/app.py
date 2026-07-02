@@ -476,7 +476,7 @@ Rules:
     return " ".join(s for s in [s1, s2, s3] if s)
 
 
-def parse_financials(raw_text: str, price: int) -> list:
+def parse_financials(raw_text: str, price: int, mode: str = "rent") -> list:
     """
     Extract all financial details from the raw WhatsApp text.
     Returns a list of '• Label: Value' strings.
@@ -498,9 +498,11 @@ def parse_financials(raw_text: str, price: int) -> list:
             pa = re.search(r"per\s+(?:annum|year|month|day)", raw_val, re.IGNORECASE)
             if pa:
                 suffix = f" {pa.group(0)}"
-        lines.append(f"• Rent: ₦{price:,}{suffix}")
+        price_label = "Price" if mode == "sale" else "Rent"
+        lines.append(f"• {price_label}: ₦{price:,}{suffix}")
     elif rent_match:
-        lines.append(f"• Rent: {rent_match.group(1).strip()}")
+        price_label = "Price" if mode == "sale" else "Rent"
+        lines.append(f"• {price_label}: {rent_match.group(1).strip()}")
 
     # Generic charge patterns — match the VALUE after the label (skip redundant label words)
     # Pattern: label word(s) optionally followed by "fee" then colon/space then value
@@ -560,7 +562,7 @@ def build_formatted_description(prop: dict, raw_bullets: list, raw_text: str = "
                        else [f"• {f}" for f in prop.get('features', [])])
 
     # Full financial breakdown from raw text
-    fin_lines = parse_financials(raw_text, price)
+    fin_lines = parse_financials(raw_text, price, mode)
     if not fin_lines:
         fin_lines = [f"• Price: {price_str}"]
 
