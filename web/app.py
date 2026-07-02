@@ -59,9 +59,9 @@ if _PROXY_URL:
 import requests as req
 try:
     import anthropic as _anthropic_sdk
-    _ANT_KEY = (CREDENTIALS.get("anthropic", {}).get("api_key", "")
-                or os.environ.get("ANTHROPIC_API_KEY", ""))
-    print(f"[INIT] ANTHROPIC_API_KEY from env: {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:30]}...", flush=True)
+    # env var always wins over orchestrate.py so key rotations take effect immediately
+    _ANT_KEY = (os.environ.get("ANTHROPIC_API_KEY", "")
+                or CREDENTIALS.get("anthropic", {}).get("api_key", ""))
     print(f"[INIT] _ANT_KEY resolved: {_ANT_KEY[:30] if _ANT_KEY else 'EMPTY'}...", flush=True)
     _ANTHROPIC_CLIENT = _anthropic_sdk.Anthropic(api_key=_ANT_KEY) if _ANT_KEY else None
 except ImportError:
