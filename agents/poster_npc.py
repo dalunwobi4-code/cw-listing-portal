@@ -78,6 +78,8 @@ TYPE_CODES = {
     "Semi-detached Duplex":  {"tid": "2", "stid": ""},
     "Terraced Duplex":       {"tid": "2", "stid": ""},
     "Bungalow":              {"tid": "2", "stid": ""},
+    # ── Land (tid=5) ─────────────────────────────────────────────────────────
+    "Land":                  {"tid": "5", "stid": ""},
 }
 
 MODE_MAP = {
@@ -115,7 +117,7 @@ def login(session, email, password):
 
 
 _NPC_NON_RESIDENTIAL = {
-    "Land", "Commercial Property", "Office Space", "Shop",
+    "Commercial Property", "Office Space", "Shop",
     "Warehouse", "Plaza", "Factory", "Event Centre",
 }
 

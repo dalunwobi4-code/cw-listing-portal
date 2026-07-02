@@ -117,28 +117,36 @@ def get_agents() -> list:
 
 # ── Airtable: get next PID ───────────────────────────────────────────────────
 
-def get_next_pid() -> str:
-    """Query Airtable for the highest CW##### and return the next one.
-    Fetches the 50 most recently created records in one call — fast regardless
-    of table size, handles mixed ID formats (ND235, CWL1457, CW#####).
-    """
+def _fetch_max_pid(prefix: str) -> int:
+    """Return the highest numeric suffix for Property IDs matching prefix + digits."""
     url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
     headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
     params  = {
         "fields[]": "Property ID",
-        "maxRecords": 50,
+        "maxRecords": 200,
         "sort[0][field]": "Created Time",
         "sort[0][direction]": "desc",
     }
     r    = req.get(url, headers=headers, params=params, timeout=15)
     data = r.json()
     max_num = 0
+    pat = re.compile(rf"^{re.escape(prefix)}(\d+)$", re.IGNORECASE)
     for rec in data.get("records", []):
         pid = rec.get("fields", {}).get("Property ID", "")
-        m = re.match(r"CW(\d+)$", str(pid), re.IGNORECASE)
+        m = pat.match(str(pid))
         if m:
             max_num = max(max_num, int(m.group(1)))
-    return f"CW{max_num + 1:05d}"
+    return max_num
+
+
+def get_next_pid() -> str:
+    """Return next CW##### property ID."""
+    return f"CW{_fetch_max_pid('CW') + 1:05d}"
+
+
+def get_next_land_pid() -> str:
+    """Return next CL##### property ID for land listings."""
+    return f"CL{_fetch_max_pid('CL') + 1:05d}"
 
 
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
@@ -239,18 +247,49 @@ def parse_description(text: str) -> dict:
     if not bathrooms: bathrooms = bedrooms
     if not toilets:   toilets   = bathrooms + 1
 
+    # ── land detection ────────────────────────────────────────────────────
+    _LAND_SIGNALS = re.compile(
+        r"\bsqm\b|sq\.?\s*m(?:etres?)?\b|\bplot\b|\bc\.?\s*of\s*o\.?\b"
+        r"|\bdeed\s+of\s+assign|\bper\s+sqm\b|/sqm",
+        re.IGNORECASE
+    )
+    is_land = bool(_LAND_SIGNALS.search(text)) or \
+              bool(re.search(r"\bland\b", t_low) and not re.search(r"\bland\s+lord\b|\bland\s+mark", t_low))
+
+    # ── sqm size (for land) ───────────────────────────────────────────────
+    size_sqm = 0
+    if is_land:
+        sqm_m = re.search(r"([\d,]+(?:\.\d+)?)\s*(?:sqm|sq\.?\s*m(?:etres?)?)\b", text, re.IGNORECASE)
+        if sqm_m:
+            size_sqm = int(float(sqm_m.group(1).replace(",", "")))
+
+    # ── land subtype (for Airtable) ───────────────────────────────────────
+    land_subtype = "Mixed Use Land"
+    if is_land:
+        if re.search(r"\bcommercial\b", t_low):
+            land_subtype = "Commercial Land"
+        elif re.search(r"\bresidential\b", t_low):
+            land_subtype = "Residential Land"
+        elif re.search(r"\bjoint\s+venture\b|\bjv\b", t_low):
+            land_subtype = "Joint Venture"
+        elif re.search(r"\bindustrial\b", t_low):
+            land_subtype = "Industrial Land"
+
     # ── property type ─────────────────────────────────────────────────────
     property_type = "Flat"
-    # Check aliases first (handles "semi detached" without hyphen, etc.)
-    for alias, canonical in _PTYPE_ALIASES.items():
-        if alias in t_low:
-            property_type = canonical
-            break
+    if is_land:
+        property_type = "Land"
     else:
-        for pt in PROPERTY_TYPES:
-            if pt.lower() in t_low:
-                property_type = pt
+        # Check aliases first (handles "semi detached" without hyphen, etc.)
+        for alias, canonical in _PTYPE_ALIASES.items():
+            if alias in t_low:
+                property_type = canonical
                 break
+        else:
+            for pt in PROPERTY_TYPES:
+                if pt.lower() in t_low:
+                    property_type = pt
+                    break
 
     # ── location ──────────────────────────────────────────────────────────
     location = "Lekki Phase 1"
@@ -293,15 +332,21 @@ def parse_description(text: str) -> dict:
         if any(kw in t_low for kw in kws):
             features.append(feat)
 
+    # ── bedrooms / baths / toilets — zero for land ───────────────────────
+    if is_land:
+        bedrooms = bathrooms = toilets = 0
+
     # ── title ─────────────────────────────────────────────────────────────
-    # Standard format: "3 Bedroom Semi-detached Duplex in Lekki Phase 1"
-    # Land/commercial (no bedroom count): "Commercial Property in VI" etc.
-    _NON_RESIDENTIAL = {"Land", "Commercial", "Office", "Shop", "Warehouse",
-                        "Plaza", "Factory", "Mall", "Event Centre"}
-    if property_type in _NON_RESIDENTIAL or not bedrooms:
-        title = f"{property_type} in {location}"
+    if is_land:
+        size_str = f"{size_sqm:,}" if size_sqm else ""
+        title = f"{size_str}sqm Land in {location}" if size_str else f"Land in {location}"
     else:
-        title = f"{bedrooms} Bedroom {property_type} in {location}"
+        _NON_RESIDENTIAL = {"Commercial Property", "Office Space", "Shop", "Warehouse",
+                            "Plaza", "Factory", "Event Centre"}
+        if property_type in _NON_RESIDENTIAL or not bedrooms:
+            title = f"{property_type} in {location}"
+        else:
+            title = f"{bedrooms} Bedroom {property_type} in {location}"
 
     # ── extract feature bullets from raw text ────────────────────────────
     BULLET_PAT   = re.compile(
@@ -347,6 +392,7 @@ def parse_description(text: str) -> dict:
     prop_stub = {
         "mode": mode, "property_type": property_type, "location": location,
         "bedrooms": bedrooms, "price": price, "features": features,
+        "is_land": is_land, "size_sqm": size_sqm,
     }
     description = build_formatted_description(prop_stub, raw_bullets, raw_text=text)
 
@@ -380,6 +426,9 @@ def parse_description(text: str) -> dict:
         "features":      features,
         "contact":       contact,
         "coordinates":   coordinates,
+        "is_land":       is_land,
+        "size_sqm":      size_sqm,
+        "land_subtype":  land_subtype,
     }
 
 
@@ -587,7 +636,7 @@ def run_job(job_id, prop, platforms, raw_image_paths):
     try:
         emit(q, "log", {"msg": f"Getting next Property ID from Airtable…"})
         with _PID_LOCK:
-            pid = get_next_pid()
+            pid = get_next_land_pid() if prop.get("is_land") else get_next_pid()
         prop["ref"] = pid
         emit(q, "pid", {"pid": pid})
         emit(q, "log", {"msg": f"Property ID: {pid}"})

@@ -25,6 +25,7 @@ LISTING_STATUS = {
     "sale":      "recGfYIASKLnzADV2",   # For Sale
     "rent":      "rec9cXDBpwqq6URo6",   # For Rent
     "short-let": "rec9cXDBpwqq6URo6",   # For Rent (closest match)
+    "land":      "recGzNMNc3Z6uQNoc",   # Land
 }
 
 # Main neighborhoods (Neigborhoods table) — used when location is itself a main area
@@ -100,6 +101,12 @@ PROPERTY_TYPE_MAP = {
     "Bungalow":             "Detached Duplex",
     "House":                "Detached Duplex",
     "Penthouse":            "Penthouse",
+    # Land subtypes
+    "Mixed Use Land":       "Mixed Use Land",
+    "Commercial Land":      "Commercial Land",
+    "Residential Land":     "Residential Land",
+    "Joint Venture":        "Joint Venture",
+    "Industrial Land":      "Industrial Land",
 }
 
 # Field IDs (from schema)
@@ -170,7 +177,8 @@ def create_record(token: str, prop: dict) -> str:
     }
 
     # Listing Status (linked record)
-    status_id = LISTING_STATUS.get(mode)
+    status_key = "land" if prop.get("is_land") else mode
+    status_id = LISTING_STATUS.get(status_key)
     if status_id:
         fields["Listing Status"] = [status_id]
 
@@ -201,7 +209,8 @@ def create_record(token: str, prop: dict) -> str:
         fields["Price Range"] = _price_range(int(price))
 
     # Property Type (singleSelect)
-    airtable_type = PROPERTY_TYPE_MAP.get(ptype)
+    type_key = prop.get("land_subtype", "Mixed Use Land") if prop.get("is_land") else ptype
+    airtable_type = PROPERTY_TYPE_MAP.get(type_key)
     if airtable_type:
         fields["Property Type"] = airtable_type
 

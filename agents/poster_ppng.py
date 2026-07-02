@@ -81,6 +81,7 @@ TYPE_CODES = {
     "Duplex":                {"type": "3",   "stype": ""},
     "Bungalow":              {"type": "3",   "stype": ""},
     "House":                 {"type": "3",   "stype": ""},
+    "Land":                  {"type": "335", "stype": ""},
 }
 
 FEATURE_CODES = {
