@@ -143,12 +143,22 @@ def get_next_pid() -> str:
 
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
 
-LOCATIONS = [
-    "Lekki Phase 1", "Lekki Phase 2", "Chevron Drive", "Chevron",
-    "Victoria Island", "VI", "Ikoyi", "Banana Island", "Magodo",
-    "Ikeja GRA", "Ikeja", "Oniru", "Ajah", "Sangotedo", "Agungi",
-    "Osapa London", "Osapa", "Idado", "Lafiaji", "Lekki",
-]
+LOCATIONS = ["Lekki Phase 1", "Victoria Island", "Ikoyi", "Lekki"]
+
+# Aliases map common spelling variants → canonical location name.
+# Order matters: more specific entries must come before substrings they contain.
+_LOC_ALIASES = {
+    "lekki phase 1":   "Lekki Phase 1",
+    "lekki phase i":   "Lekki Phase 1",
+    "lekki ph 1":      "Lekki Phase 1",
+    "lekki ph1":       "Lekki Phase 1",
+    "phase 1 lekki":   "Lekki Phase 1",
+    "victoria island": "Victoria Island",
+    "v.i.":            "Victoria Island",
+    "v/i":             "Victoria Island",
+    "ikoyi":           "Ikoyi",
+    "lekki":           "Lekki",
+}
 PROPERTY_TYPES = [
     "Semi-detached Duplex", "Terraced Duplex", "Detached Duplex",
     "Apartment", "Flat", "Duplex", "Bungalow", "House", "Studio",
@@ -243,9 +253,9 @@ def parse_description(text: str) -> dict:
 
     # ── location ──────────────────────────────────────────────────────────
     location = "Lekki Phase 1"
-    for loc in LOCATIONS:
-        if loc.lower() in t_low:
-            location = loc
+    for alias, canonical in _LOC_ALIASES.items():
+        if alias in t_low:
+            location = canonical
             break
 
     # ── price ─────────────────────────────────────────────────────────────
