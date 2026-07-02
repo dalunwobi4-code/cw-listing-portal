@@ -145,8 +145,8 @@ def get_next_pid() -> str:
 
 
 def get_next_land_pid() -> str:
-    """Return next CL##### property ID for land listings."""
-    return f"CL{_fetch_max_pid('CL') + 1:05d}"
+    """Return next CWL#### property ID for land listings (e.g. CWL1531)."""
+    return f"CWL{_fetch_max_pid('CWL') + 1}"
 
 
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
