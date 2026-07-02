@@ -356,40 +356,71 @@ def parse_description(text: str) -> dict:
         r'^[•‣◦⁃∙\-\*\+✅✔✓☑➡➤▶►🔥🏠💎🌟⭐🔑🏡✨🎯]|^\d+[\.\)]\s')
     BULLET_STRIP = re.compile(
         r'^[•‣◦⁃∙\-\*\+✅✔✓☑➡➤▶►🔥🏠💎🌟⭐🔑🏡✨🎯]+\s*|^\d+[\.\)]\s*')
-    SKIP_PRICE   = re.compile(
-        r'price[:\s]|₦|\bcontact\b|\bcall\b|per annum|p\.a\.|per year|📍|💰', re.IGNORECASE)
+    # Lines to skip — financial/contact/metadata (used in all passes)
+    SKIP_FINANCIAL = re.compile(
+        r'price[:\s]|₦|\bcontact\b|\bcall\b|per annum|p\.a\.|per year|📍|💰'
+        r'|\bagency\b|\blegal\b|\bcaution\b|\bservice charge\b|\btotal\b'
+        r'|\bcommission\b|\bpremium\b|\bfacilitator\b'
+        r'|\d{10,}',   # phone numbers
+        re.IGNORECASE
+    )
+    # Lines that are metadata headers / location / title — not features
+    SKIP_META = re.compile(
+        r'^\s*(?:details?|lekki|victoria island|ikoyi|lagos|nigeria'
+        r'|for\s+(?:rent|sale|let)|serviced|available|contact|call'
+        r'|\d+\s*(?:bedroom|bed|bath|toilet)'
+        r'|[A-Z\s!]{10,})\s*$',   # ALL-CAPS shouting lines (title/header)
+        re.IGNORECASE
+    )
 
     raw_bullets = []
 
-    # First pass: lines with explicit bullet symbols
+    # Pass 1: lines with explicit bullet symbols — skip financial items
     for line in lines:
         line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
         if BULLET_PAT.match(line):
             cleaned = BULLET_STRIP.sub('', line).strip()
-            if cleaned and not SKIP_PRICE.search(cleaned):
+            if cleaned and not SKIP_FINANCIAL.search(cleaned):
                 raw_bullets.append(cleaned)
 
-    # Second pass: plain lines under a "Features:" section header
-    if not raw_bullets or len(raw_bullets) < 3:
-        in_features = False
-        SKIP_FEAT = re.compile(
-            r'(?:price|rent|agency|legal|caution|service charge|total|contact|'
-            r'call|location|per annum|₦|p\.a\.|per year|charges|other)',
+    # Pass 2: plain lines under a "Features:" section header
+    in_features = False
+    for line in lines:
+        line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
+        if re.match(r'(?:property\s+)?features?\s*:?$', line, re.IGNORECASE):
+            in_features = True
+            continue
+        if in_features:
+            if re.search(r':\s*$', line) and len(line) < 40:
+                in_features = False
+                continue
+            if line and not SKIP_FINANCIAL.search(line) and not BULLET_PAT.match(line):
+                if line not in raw_bullets:
+                    raw_bullets.append(line)
+
+    # Pass 3: plain lines that look like property features even without a header.
+    # Catches listings that just list amenities one-per-line (no bullets, no header).
+    # Only run if pass 1+2 produced fewer than 3 real features.
+    if len(raw_bullets) < 3:
+        FEATURE_LINE = re.compile(
+            r'\b(?:room|ensuite|pool|security|electricity|generator|bq|boys quarter'
+            r'|elevator|lift|gym|cctv|intercom|parking|kitchen|wardrobe|balcony'
+            r'|floor|shower|bath|heater|air condition|a\.?c|dstv|solar|inverter'
+            r'|water|compound|spacious|furnished|serviced|smart|home|cinema|rooftop'
+            r'|terrace|penthouse|walk.?in|fitted|tiled|marble|granite|hardwood'
+            r'|pre.?paid|post.?paid|24\s*hour|24hrs|visitor|lounge|dining)\b',
             re.IGNORECASE
         )
         for line in lines:
             line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
-            if re.match(r'(?:property\s+)?features?\s*:?$', line, re.IGNORECASE):
-                in_features = True
-                continue
-            if in_features:
-                # Stop when we hit another section header
-                if re.search(r':\s*$', line) and len(line) < 40:
-                    in_features = False
-                    continue
-                if line and not SKIP_FEAT.search(line) and not BULLET_PAT.match(line):
-                    if line not in raw_bullets:
-                        raw_bullets.append(line)
+            if (line
+                    and not BULLET_PAT.match(line)
+                    and not SKIP_FINANCIAL.search(line)
+                    and not SKIP_META.search(line)
+                    and len(line) <= 60
+                    and FEATURE_LINE.search(line)
+                    and line not in raw_bullets):
+                raw_bullets.append(line)
 
     # ── build formatted description from parsed data ──────────────────────
     prop_stub = {
@@ -543,7 +574,7 @@ INSTRUCTIONS:
 9. Output ONLY the paragraph — nothing else"""
 
             message = _ANTHROPIC_CLIENT.messages.create(
-                model="claude-haiku-4-5",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=350,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -551,6 +582,7 @@ INSTRUCTIONS:
 
         except Exception as e:
             print(f"[Claude API] SEO description failed: {e}", flush=True)
+            import traceback; traceback.print_exc()
 
     # ── fallback: basic template ─────────────────────────────────────────────
     if is_land:
