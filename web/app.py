@@ -401,27 +401,39 @@ def parse_description(text: str) -> dict:
 
     # Pass 3: plain lines that look like property features even without a header.
     # Catches listings that just list amenities one-per-line (no bullets, no header).
-    # Only run if pass 1+2 produced fewer than 3 real features.
-    if len(raw_bullets) < 3:
-        FEATURE_LINE = re.compile(
-            r'\b(?:room|ensuite|pool|security|electricity|generator|bq|boys quarter'
-            r'|elevator|lift|gym|cctv|intercom|parking|kitchen|wardrobe|balcony'
-            r'|floor|shower|bath|heater|air condition|a\.?c|dstv|solar|inverter'
-            r'|water|compound|spacious|furnished|serviced|smart|home|cinema|rooftop'
-            r'|terrace|penthouse|walk.?in|fitted|tiled|marble|granite|hardwood'
-            r'|pre.?paid|post.?paid|24\s*hour|24hrs|visitor|lounge|dining)\b',
-            re.IGNORECASE
-        )
-        for line in lines:
-            line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
-            if (line
-                    and not BULLET_PAT.match(line)
-                    and not SKIP_FINANCIAL.search(line)
-                    and not SKIP_META.search(line)
-                    and len(line) <= 60
-                    and FEATURE_LINE.search(line)
-                    and line not in raw_bullets):
-                raw_bullets.append(line)
+    # Always run — pass 1/2 may have caught financial items as bullets.
+    FEATURE_LINE = re.compile(
+        r'\b(?:ensuite|pool|security|electricity|generator|bq|boys quarter'
+        r'|elevator|lift|gym|cctv|intercom|parking|kitchen|wardrobe|balcony'
+        r'|floor|shower|bath|heater|air condition|a\.?c|dstv|solar|inverter'
+        r'|compound|spacious|furnished|smart|cinema|rooftop'
+        r'|penthouse|walk.?in|fitted|tiled|marble|granite|hardwood'
+        r'|pre.?paid|post.?paid|24\s*hour|24hrs|visitor|lounge|dining'
+        r'|swimming|ensuite|all\s+room|ample|interlocked|water\s+heater'
+        r'|boys?\s+quarter|store\s+room|family\s+lounge|open\s+plan)\b',
+        re.IGNORECASE
+    )
+    # Extra skip: title/header lines (FOR RENT/SALE, all-caps, metadata)
+    SKIP_HEADER = re.compile(
+        r'for\s+(?:rent|sale|let|short.?let)|serviced[\.\s]|available|details?'
+        r'|\bYTD\b',
+        re.IGNORECASE
+    )
+    title_line = lines[0] if lines else ""
+    for line in lines:
+        line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
+        # Strip invisible Unicode chars WhatsApp sometimes prepends (U+2060, U+200B etc.)
+        clean = re.sub(r'^[⁠​‌‍﻿ ]+', '', line).strip()
+        if (clean
+                and clean != title_line
+                and not BULLET_PAT.match(clean)
+                and not SKIP_FINANCIAL.search(clean)
+                and not SKIP_HEADER.search(clean)
+                and not SKIP_META.search(clean)
+                and len(clean) <= 60
+                and FEATURE_LINE.search(clean)
+                and clean not in raw_bullets):
+            raw_bullets.append(clean)
 
     # ── build formatted description from parsed data ──────────────────────
     prop_stub = {
