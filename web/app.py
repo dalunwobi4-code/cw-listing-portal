@@ -59,10 +59,11 @@ if _PROXY_URL:
 import requests as req
 try:
     import anthropic as _anthropic_sdk
-    _ANTHROPIC_CLIENT = _anthropic_sdk.Anthropic(
-        api_key=CREDENTIALS.get("anthropic", {}).get("api_key", "")
-            or os.environ.get("ANTHROPIC_API_KEY", "")
-    ) if (CREDENTIALS.get("anthropic", {}).get("api_key") or os.environ.get("ANTHROPIC_API_KEY")) else None
+    _ANT_KEY = (CREDENTIALS.get("anthropic", {}).get("api_key", "")
+                or os.environ.get("ANTHROPIC_API_KEY", ""))
+    print(f"[INIT] ANTHROPIC_API_KEY from env: {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:30]}...", flush=True)
+    print(f"[INIT] _ANT_KEY resolved: {_ANT_KEY[:30] if _ANT_KEY else 'EMPTY'}...", flush=True)
+    _ANTHROPIC_CLIENT = _anthropic_sdk.Anthropic(api_key=_ANT_KEY) if _ANT_KEY else None
 except ImportError:
     _ANTHROPIC_CLIENT = None
 
