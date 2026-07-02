@@ -148,6 +148,7 @@ LOCATIONS = ["Lekki Phase 1", "Victoria Island", "Ikoyi", "Lekki"]
 # Aliases map common spelling variants → canonical location name.
 # Order matters: more specific entries must come before substrings they contain.
 _LOC_ALIASES = {
+    "lekki phase one": "Lekki Phase 1",
     "lekki phase 1":   "Lekki Phase 1",
     "lekki phase i":   "Lekki Phase 1",
     "lekki ph 1":      "Lekki Phase 1",
