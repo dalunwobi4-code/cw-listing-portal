@@ -487,54 +487,64 @@ def generate_overview(prop: dict, raw_bullets: list, raw_text: str = "") -> str:
     # ── try Claude API ───────────────────────────────────────────────────────
     if _ANTHROPIC_CLIENT:
         try:
+            land_subtype = prop.get('land_subtype', 'Land')
+
             if is_land:
-                land_subtype = prop.get('land_subtype', 'Land')
-                prompt = f"""You are an SEO copywriter for a premium Nigerian real estate agency.
+                prompt = f"""You are a senior property copywriter for CW Real Estate, a premium Lagos agency.
 
-Write a SHORT, keyword-rich intro for a land listing on online property portals.
+Your job: write a compelling, SEO-rich overview paragraph for a LAND listing to be posted on Nigerian property portals (NPC, PropertyPro, PrivateProperty).
 
-Land Details:
-- Size: {size_str.strip() or 'See listing'}
-- Type: {land_subtype}
-- Location: {loc}, Lagos, Nigeria
+RAW LISTING TEXT (WhatsApp):
+\"\"\"
+{raw_text}
+\"\"\"
+
+PARSED CONTEXT:
+- Size: {size_str.strip() or 'see listing'}
+- Land type: {land_subtype}
+- Location: {loc}, Lagos
 - Price: {price_str}
-- Key Details: {', '.join(raw_bullets) if raw_bullets else '(see listing)'}
 
-Rules:
-1. Write EXACTLY 3 sentences — no more, no less
-2. Sentence 1: hook with size, land type, location, and price
-3. Sentence 2: highlight the opportunity (development potential, title documents, etc.)
-4. Sentence 3: mention location appeal and investment angle
-5. Pack in SEO keywords: "{size_str.strip()} land {loc}", "land for sale Lagos", "{loc} Lagos"
-6. Tone: premium, investment-focused, direct
-7. NO bullet points, NO headers, NO markdown — pure flowing sentences
-8. Do NOT mention any agency name or contact details
-9. Output ONLY the 3 sentences, nothing else"""
+INSTRUCTIONS:
+1. Write 4–5 flowing sentences (no bullet points, no headers, no markdown)
+2. Open with the size, land type, location, and price — make it punchy
+3. Pull out the SPECIFIC details from the raw text (title docs, development proposal, JV terms, etc.) — do NOT invent anything not in the source
+4. Mention investment angle and why this location is desirable
+5. Close with a subtle call to action ("Contact us to schedule a site visit" or similar)
+6. Weave in SEO keywords naturally: "land for sale in {loc}", "{loc} Lagos real estate", "{size_str.strip()} plot"
+7. Tone: premium, factual, investment-focused
+8. Do NOT mention any phone numbers, agent names, or company names
+9. Output ONLY the paragraph — nothing else"""
             else:
-                prompt = f"""You are an SEO copywriter for a premium Nigerian real estate agency.
+                prompt = f"""You are a senior property copywriter for CW Real Estate, a premium Lagos agency.
 
-Write a SHORT, keyword-rich property intro for online listing portals.
+Your job: write a compelling, SEO-rich overview paragraph for a property listing to be posted on Nigerian property portals (NPC, PropertyPro, PrivateProperty).
 
-Property:
-- {beds} Bedroom {ptype} {mode_str}
-- Location: {loc}, Lagos, Nigeria
+RAW LISTING TEXT (WhatsApp):
+\"\"\"
+{raw_text}
+\"\"\"
+
+PARSED CONTEXT:
+- Type: {beds} Bedroom {ptype}
+- Mode: {mode_str}
+- Location: {loc}, Lagos
 - Price: {price_str}
-- Features: {', '.join(raw_bullets) if raw_bullets else '(see listing)'}
 
-Rules:
-1. Write EXACTLY 3 sentences — no more, no less
-2. Sentence 1: hook with property type, bedrooms, mode, location, and price
-3. Sentence 2: highlight the best 3-4 interior features
-4. Sentence 3: mention key building/estate amenity + location appeal
-5. Pack in SEO keywords naturally: "{beds} bedroom {ptype.lower()} {mode_str.lower()} {loc}", "Lagos real estate", "{loc} Lagos"
-6. Tone: premium, confident, aspirational
-7. NO bullet points, NO headers, NO markdown — pure flowing sentences
-8. Do NOT mention any agency name or contact details
-9. Output ONLY the 3 sentences, nothing else"""
+INSTRUCTIONS:
+1. Write 4–5 flowing sentences (no bullet points, no headers, no markdown)
+2. Open with a hook: property type, bedrooms, mode, location, and price — make it specific and punchy
+3. Pull out the SPECIFIC features and amenities from the raw text — do NOT use generic filler phrases like "beautifully finished" or "tastefully furnished" unless those exact words are in the source
+4. Mention estate/building quality cues from the raw text (e.g. smart home, BQ, rooftop, generator capacity, etc.)
+5. Close with location appeal and a subtle call to action
+6. Weave in SEO keywords: "{beds} bedroom {ptype.lower()} {mode_str.lower()} in {loc}", "{loc} Lagos real estate", "Lagos property"
+7. Tone: premium, confident, specific — no vague superlatives
+8. Do NOT mention any phone numbers, agent names, or company names
+9. Output ONLY the paragraph — nothing else"""
 
             message = _ANTHROPIC_CLIENT.messages.create(
                 model="claude-haiku-4-5",
-                max_tokens=200,
+                max_tokens=350,
                 messages=[{"role": "user", "content": prompt}]
             )
             return message.content[0].text.strip()
