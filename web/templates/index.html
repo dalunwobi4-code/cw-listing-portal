@@ -416,10 +416,6 @@ function renderPreview(p) {
       </div>
     </div>
     <div class="pf full">
-      <div class="pf-label">Street / Address</div>
-      <input class="edit-field" id="edit-street" value="${escHtml(p.street)}">
-    </div>
-    <div class="pf full">
       <div class="pf-label">Features <span style="color:var(--muted);font-weight:400">(one per line)</span></div>
       <textarea class="edit-field edit-textarea" id="edit-features" rows="4">${escHtml(featsText)}</textarea>
     </div>
@@ -489,7 +485,7 @@ async function submitJob() {
     bedrooms:      parseInt(document.getElementById('edit-bedrooms').value) || 0,
     bathrooms:     parseInt(document.getElementById('edit-bathrooms').value) || 0,
     toilets:       parseInt(document.getElementById('edit-toilets').value) || 0,
-    street:        document.getElementById('edit-street').value.trim(),
+    street:        p.street || '',
     description:   document.getElementById('edit-description').value,
     features:      document.getElementById('edit-features').value.split('\n').map(f=>f.trim()).filter(Boolean),
     agent_id:      agentId,
