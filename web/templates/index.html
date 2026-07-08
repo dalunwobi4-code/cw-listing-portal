@@ -191,19 +191,22 @@ textarea::placeholder { color: var(--muted); }
       <div class="card">
         <div class="card-title">WhatsApp Property Description</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">
-          🌍 <strong>Land listing?</strong> Add <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">LAND LISTING</code> as the very first line.
+          ⚡ <strong>Always start with the property type tag</strong> — e.g.
+          <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">APARTMENT LISTING</code>
+          <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">DUPLEX LISTING</code>
+          <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">LAND LISTING</code>
+          <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">COMMERCIAL LISTING</code>
+          <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">OFFICE LISTING</code>
         </div>
         <textarea id="desc-input"
-          placeholder="Paste the agent's WhatsApp message here…
+          placeholder="Start with the property type tag, then paste the WhatsApp message:
 
-For LAND listings, start with:
-LAND LISTING
-2,560sqm Joint Venture in Ikoyi…
-
-For regular properties:
+APARTMENT LISTING
 4 Bedroom Semi-Detached Duplex for Rent in Lekki Phase 1
 Price: ₦18M per annum
-Contact: …"></textarea>
+…
+
+Available tags: APARTMENT · FLAT · STUDIO · PENTHOUSE · DUPLEX · DETACHED · TERRACED · SEMI-DETACHED · BUNGALOW · HOUSE · MANSION · TOWNHOUSE · COMMERCIAL · OFFICE · SHOP · WAREHOUSE · LAND"></textarea>
         <button class="parse-btn" id="parse-btn" onclick="parseDesc()">
           Parse Description
         </button>

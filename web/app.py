@@ -251,15 +251,39 @@ def parse_description(text: str) -> dict:
     if not bathrooms: bathrooms = bedrooms
     if not toilets:   toilets   = bathrooms + 1
 
-    # ── land detection ────────────────────────────────────────────────────
-    # Primary: explicit tag the team puts at the top of every land listing
-    _LAND_TAG = re.compile(r'^\s*(?:land\s+listing|#land|type\s*:\s*land)\b', re.IGNORECASE | re.MULTILINE)
-    # Secondary: genuinely land-specific terms (not sqm — that appears in commercial floor space too)
-    _LAND_SIGNALS = re.compile(
-        r"\bplot\b|\bdeed\s+of\s+assign\b",
-        re.IGNORECASE
+    # ── property type tag (team adds as first line, overrides all regex) ──
+    _PROP_TAG_RE = re.compile(
+        r'^\s*(apartment|flat|studio|penthouse|semi[\s\-]?detached|terraced?|detached'
+        r'|duplex|bungalow|house|mansion|townhouse|commercial|office|shop|warehouse'
+        r'|plaza|factory|event\s+centre|land)\s+listing\s*$',
+        re.IGNORECASE | re.MULTILINE
     )
-    is_land = (bool(_LAND_TAG.search(text))
+    _PROP_TAG_MAP = {
+        "apartment":     "Apartment",          "flat":          "Apartment",
+        "studio":        "Studio",             "penthouse":     "Penthouse",
+        "semi detached": "Semi-detached Duplex","semi-detached": "Semi-detached Duplex",
+        "semidetached":  "Semi-detached Duplex",
+        "terraced":      "Terraced Duplex",    "terrace":       "Terraced Duplex",
+        "detached":      "Detached Duplex",    "duplex":        "Detached Duplex",
+        "bungalow":      "Bungalow",           "house":         "House",
+        "mansion":       "Mansion",            "townhouse":     "Townhouse",
+        "commercial":    "Commercial Property","office":        "Office Space",
+        "shop":          "Shop",               "warehouse":     "Warehouse",
+        "plaza":         "Plaza",              "factory":       "Factory",
+        "event centre":  "Event Centre",       "land":          "Land",
+    }
+    tag_match = _PROP_TAG_RE.search(text)
+    tagged_type = None
+    if tag_match:
+        tag_key = re.sub(r'[\s\-]+', ' ', tag_match.group(1).lower().strip())
+        tagged_type = _PROP_TAG_MAP.get(tag_key)
+        # Strip tag line from lines so it doesn't pollute features/title
+        tag_line = tag_match.group(0).strip()
+        lines = [l for l in lines if l.strip().lower() != tag_line.lower()]
+
+    # ── land detection ────────────────────────────────────────────────────
+    _LAND_SIGNALS = re.compile(r"\bplot\b|\bdeed\s+of\s+assign\b", re.IGNORECASE)
+    is_land = (tagged_type == "Land"
                or bool(_LAND_SIGNALS.search(text))
                or bool(re.search(r"\bland\b", t_low)
                        and not re.search(r"\bland\s*lord\b|\bland\s*mark\b|\bislande?\b", t_low)))
@@ -284,10 +308,12 @@ def parse_description(text: str) -> dict:
             land_subtype = "Industrial Land"
 
     # ── property type ─────────────────────────────────────────────────────
-    property_type = "Flat"
-    if is_land:
+    if tagged_type:
+        property_type = tagged_type
+    elif is_land:
         property_type = "Land"
     else:
+        property_type = "Flat"
         # Check aliases first (handles "semi detached" without hyphen, etc.)
         for alias, canonical in _PTYPE_ALIASES.items():
             if alias in t_low:
