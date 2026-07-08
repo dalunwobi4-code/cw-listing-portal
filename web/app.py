@@ -253,7 +253,7 @@ def parse_description(text: str) -> dict:
 
     # ── land detection ────────────────────────────────────────────────────
     _LAND_SIGNALS = re.compile(
-        r"\bsqm\b|sq\.?\s*m(?:etres?)?\b|\bplot\b|\bc\.?\s*of\s*o\.?\b"
+        r"\bsqm\b|sq\.?\s*m(?:etres?)?\b|\bplot\b"
         r"|\bdeed\s+of\s+assign|\bper\s+sqm\b|/sqm",
         re.IGNORECASE
     )
@@ -353,6 +353,9 @@ def parse_description(text: str) -> dict:
             title = f"{bedrooms} Bedroom {property_type} in {location}"
 
     # ── extract feature bullets from raw text ────────────────────────────
+    _INVIS = re.compile(r'[\xad​‌‍‎‏    ⁠⁡⁢⁣⁤﻿]')
+    def _clean(s): return _INVIS.sub('', s).strip()
+
     BULLET_PAT   = re.compile(
         r'^[•‣◦⁃∙\-\*\+✅✔✓☑➡➤▶►🔥🏠💎🌟⭐🔑🏡✨🎯]|^\d+[\.\)]\s')
     BULLET_STRIP = re.compile(
@@ -422,8 +425,8 @@ def parse_description(text: str) -> dict:
     title_line = lines[0] if lines else ""
     for line in lines:
         line = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line).strip()
-        # Strip invisible Unicode chars WhatsApp sometimes prepends (U+2060, U+200B etc.)
-        clean = re.sub(r'^[⁠​‌‍﻿ ]+', '', line).strip()
+        # Strip invisible Unicode chars WhatsApp injects anywhere in the line
+        clean = re.sub(r'[­​‌‍‎‏    ⁠⁡⁢⁣⁤﻿]', '', line).strip()
         if (clean
                 and clean != title_line
                 and not BULLET_PAT.match(clean)
