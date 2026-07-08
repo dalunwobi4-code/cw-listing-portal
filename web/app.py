@@ -252,13 +252,17 @@ def parse_description(text: str) -> dict:
     if not toilets:   toilets   = bathrooms + 1
 
     # ── land detection ────────────────────────────────────────────────────
+    # Primary: explicit tag the team puts at the top of every land listing
+    _LAND_TAG = re.compile(r'^\s*(?:land\s+listing|#land|type\s*:\s*land)\b', re.IGNORECASE | re.MULTILINE)
+    # Secondary: genuinely land-specific terms (not sqm — that appears in commercial floor space too)
     _LAND_SIGNALS = re.compile(
-        r"\bsqm\b|sq\.?\s*m(?:etres?)?\b|\bplot\b"
-        r"|\bdeed\s+of\s+assign|\bper\s+sqm\b|/sqm",
+        r"\bplot\b|\bdeed\s+of\s+assign\b",
         re.IGNORECASE
     )
-    is_land = bool(_LAND_SIGNALS.search(text)) or \
-              bool(re.search(r"\bland\b", t_low) and not re.search(r"\bland\s+lord\b|\bland\s+mark", t_low))
+    is_land = (bool(_LAND_TAG.search(text))
+               or bool(_LAND_SIGNALS.search(text))
+               or bool(re.search(r"\bland\b", t_low)
+                       and not re.search(r"\bland\s*lord\b|\bland\s*mark\b|\bislande?\b", t_low)))
 
     # ── sqm size (for land) ───────────────────────────────────────────────
     size_sqm = 0

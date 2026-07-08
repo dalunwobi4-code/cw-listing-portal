@@ -190,18 +190,18 @@ textarea::placeholder { color: var(--muted); }
       <!-- Description input -->
       <div class="card">
         <div class="card-title">WhatsApp Property Description</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">
+          🌍 <strong>Land listing?</strong> Add <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">LAND LISTING</code> as the very first line.
+        </div>
         <textarea id="desc-input"
           placeholder="Paste the agent's WhatsApp message here…
 
-e.g.
+For LAND listings, start with:
+LAND LISTING
+2,560sqm Joint Venture in Ikoyi…
+
+For regular properties:
 4 Bedroom Semi-Detached Duplex for Rent in Lekki Phase 1
-
-Spacious fully-furnished duplex in a gated estate. Features include:
-- All rooms ensuite
-- Swimming pool
-- 24-hour security
-- Boys quarter
-
 Price: ₦18M per annum
 Contact: …"></textarea>
         <button class="parse-btn" id="parse-btn" onclick="parseDesc()">
