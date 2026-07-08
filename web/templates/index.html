@@ -154,6 +154,22 @@ textarea::placeholder { color: var(--muted); }
 .job-card .done-banner { margin-top: 8px; }
 .airtable-notice { font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic; }
 
+/* editable parsed fields */
+.edit-field {
+  width: 100%; padding: 7px 10px; background: #111; border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .15s; font-weight: 600;
+}
+.edit-field:focus { border-color: var(--accent); }
+.edit-select { appearance: none; cursor: pointer; padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%23777' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; }
+.edit-select option { background: #1a1a1a; }
+.edit-num { max-width: 72px; text-align: center; }
+.edit-textarea { resize: vertical; font-weight: 400; line-height: 1.6; min-height: 90px; }
+.edit-desc { min-height: 160px; }
+.pf .pf-label { color: var(--muted); margin-bottom: 4px; font-size: 11px; }
+
 /* agent select */
 .agent-select {
   width: 100%; padding: 10px 12px; background: #111; border: 1px solid var(--border);
@@ -350,52 +366,68 @@ async function parseDesc() {
   }
 }
 
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function renderPreview(p) {
-  const preview = document.getElementById('parsed-preview');
-  const grid    = document.getElementById('preview-grid');
-  preview.style.display = 'block';
+  document.getElementById('parsed-preview').style.display = 'block';
 
-  const modeLabel = { sale: 'For Sale', rent: 'For Rent', 'short-let': 'Short Let' };
-  const price     = p.price ? '₦' + Number(p.price).toLocaleString() : '—';
-  const feats     = (p.features || []).map(f => `<span class="chip">${f}</span>`).join('');
+  const MODES   = ['sale','rent','short-let'];
+  const MLABELS = { sale:'For Sale', rent:'For Rent', 'short-let':'Short Let' };
+  const PTYPES  = ['Apartment','Studio','Penthouse','Semi-detached Duplex','Terraced Duplex',
+                   'Detached Duplex','Duplex','Bungalow','House','Mansion','Townhouse',
+                   'Commercial Property','Office Space','Shop','Warehouse','Plaza',
+                   'Factory','Event Centre','Land'];
+  const LOCS    = ['Lekki Phase 1','Victoria Island','Ikoyi','Lekki'];
 
-  grid.innerHTML = `
+  const modeOpts  = MODES.map(m  => `<option value="${m}" ${p.mode===m?'selected':''}>${MLABELS[m]}</option>`).join('');
+  const ptypeOpts = PTYPES.map(t => `<option value="${t}" ${p.property_type===t?'selected':''}>${t}</option>`).join('');
+  const locOpts   = LOCS.map(l   => `<option value="${l}" ${p.location===l?'selected':''}>${l}</option>`).join('');
+  const featsText = (p.features || []).join('\n');
+
+  document.getElementById('preview-grid').innerHTML = `
     <div class="pf full">
       <div class="pf-label">Title</div>
-      <div class="pf-val title-val">${p.title || '—'}</div>
+      <input class="edit-field" id="edit-title" value="${escHtml(p.title)}">
     </div>
     <div class="pf">
       <div class="pf-label">Mode</div>
-      <div class="pf-val">${modeLabel[p.mode] || p.mode || '—'}</div>
+      <select class="edit-field edit-select" id="edit-mode">${modeOpts}</select>
     </div>
     <div class="pf">
-      <div class="pf-label">Type</div>
-      <div class="pf-val">${p.property_type || '—'}</div>
+      <div class="pf-label">Property Type</div>
+      <select class="edit-field edit-select" id="edit-ptype">${ptypeOpts}</select>
     </div>
     <div class="pf">
       <div class="pf-label">Location</div>
-      <div class="pf-val">${p.location || '—'}</div>
+      <select class="edit-field edit-select" id="edit-location">${locOpts}</select>
     </div>
     <div class="pf">
-      <div class="pf-label">Price</div>
-      <div class="pf-val">${price}</div>
+      <div class="pf-label">Price (₦)</div>
+      <input class="edit-field" id="edit-price" type="number" min="0" value="${p.price||0}">
     </div>
     <div class="pf">
-      <div class="pf-label">Bedrooms / Baths / Toilets</div>
-      <div class="pf-val">${p.bedrooms || 0} / ${p.bathrooms || 0} / ${p.toilets || 0}</div>
+      <div class="pf-label">Beds / Baths / Toilets</div>
+      <div style="display:flex;gap:6px;">
+        <input class="edit-field edit-num" id="edit-bedrooms"  type="number" min="0" value="${p.bedrooms||0}"  placeholder="Beds">
+        <input class="edit-field edit-num" id="edit-bathrooms" type="number" min="0" value="${p.bathrooms||0}" placeholder="Baths">
+        <input class="edit-field edit-num" id="edit-toilets"   type="number" min="0" value="${p.toilets||0}"   placeholder="WC">
+      </div>
     </div>
-    ${p.street ? `<div class="pf full"><div class="pf-label">Street</div><div class="pf-val">${p.street}</div></div>` : ''}
-    ${feats ? `<div class="pf full"><div class="pf-label">Features</div><div class="chip-list">${feats}</div></div>` : ''}
-    ${p.description ? `<div class="pf full"><div class="pf-label">Description</div><div class="pf-val desc-val">${p.description.replace(/\n/g, '<br>')}</div></div>` : ''}
+    <div class="pf full">
+      <div class="pf-label">Street / Address</div>
+      <input class="edit-field" id="edit-street" value="${escHtml(p.street)}">
+    </div>
+    <div class="pf full">
+      <div class="pf-label">Features <span style="color:var(--muted);font-weight:400">(one per line)</span></div>
+      <textarea class="edit-field edit-textarea" id="edit-features" rows="4">${escHtml(featsText)}</textarea>
+    </div>
+    <div class="pf full">
+      <div class="pf-label">Description</div>
+      <textarea class="edit-field edit-textarea edit-desc" id="edit-description">${escHtml(p.description)}</textarea>
+    </div>
   `;
-
-  const agentSel = document.getElementById('agent-select');
-  if (agentSel.value) {
-    const div = document.createElement('div');
-    div.className = 'pf';
-    div.innerHTML = `<div class="pf-label">Agent</div><div class="pf-val">${agentSel.options[agentSel.selectedIndex].text}</div>`;
-    grid.appendChild(div);
-  }
 }
 
 // ── images ────────────────────────────────────────────────────────────────
@@ -446,8 +478,23 @@ async function submitJob() {
   postBtn.disabled = true;
   postBtn.innerHTML = '<span class="spin"></span>Uploading images…';
 
-  // Snapshot current form state before clearing
-  const prop          = { ...parsedProp, agent_id: agentId, agent_name: agentName };
+  // Snapshot current form state (read editable fields so manual corrections carry through)
+  const prop = {
+    ...parsedProp,
+    title:         document.getElementById('edit-title').value.trim(),
+    mode:          document.getElementById('edit-mode').value,
+    property_type: document.getElementById('edit-ptype').value,
+    location:      document.getElementById('edit-location').value,
+    price:         parseInt(document.getElementById('edit-price').value) || 0,
+    bedrooms:      parseInt(document.getElementById('edit-bedrooms').value) || 0,
+    bathrooms:     parseInt(document.getElementById('edit-bathrooms').value) || 0,
+    toilets:       parseInt(document.getElementById('edit-toilets').value) || 0,
+    street:        document.getElementById('edit-street').value.trim(),
+    description:   document.getElementById('edit-description').value,
+    features:      document.getElementById('edit-features').value.split('\n').map(f=>f.trim()).filter(Boolean),
+    agent_id:      agentId,
+    agent_name:    agentName,
+  };
   const sessionId     = 'sess_' + Math.random().toString(36).slice(2, 10);
   const filesToUpload = uploadedFiles.slice();
   const jobTitle      = parsedProp.title || 'Property';
