@@ -176,8 +176,9 @@ def create_record(token: str, prop: dict) -> str:
         "New Price":      price_str,
     }
 
-    # Listing Status (linked record)
-    status_key = "land" if prop.get("is_land") else mode
+    # Listing Status (linked record) — derive from property_type so edits carry through
+    is_land = prop.get("property_type", "") == "Land"
+    status_key = "land" if is_land else mode
     status_id = LISTING_STATUS.get(status_key)
     if status_id:
         fields["Listing Status"] = [status_id]
@@ -209,7 +210,7 @@ def create_record(token: str, prop: dict) -> str:
         fields["Price Range"] = _price_range(int(price))
 
     # Property Type (singleSelect)
-    type_key = prop.get("land_subtype", "Mixed Use Land") if prop.get("is_land") else ptype
+    type_key = prop.get("land_subtype", "Mixed Use Land") if is_land else ptype
     airtable_type = PROPERTY_TYPE_MAP.get(type_key)
     if airtable_type:
         fields["Property Type"] = airtable_type

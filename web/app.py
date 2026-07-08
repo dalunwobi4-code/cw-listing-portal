@@ -759,7 +759,9 @@ def run_job(job_id, prop, platforms, raw_image_paths):
     try:
         emit(q, "log", {"msg": f"Getting next Property ID from Airtable…"})
         with _PID_LOCK:
-            pid = get_next_land_pid() if prop.get("is_land") else get_next_pid()
+            # Use property_type as source of truth (user may have edited it)
+            pid = get_next_land_pid() if prop.get("property_type") == "Land" else get_next_pid()
+            prop["is_land"] = (prop.get("property_type") == "Land")
         prop["ref"] = pid
         emit(q, "pid", {"pid": pid})
         emit(q, "log", {"msg": f"Property ID: {pid}"})
