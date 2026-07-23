@@ -35,28 +35,28 @@ CREDENTIALS = {
     "ppng": {
         "email": "listings@cwlagos.com",
         "password": "Listings@1234",
-        "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
+        "proxy_url": "http://1ba810eefd20927d:HIXnc1UtVE4u9r6q@res.proxy-seller.com:10000"
     },
     "propertypro": {
         "email": "listings@cwlagos.com",
         "password": "Listings@1234",
-        "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
+        "proxy_url": "http://1ba810eefd20927d:HIXnc1UtVE4u9r6q@res.proxy-seller.com:10000"
     },
     "npc_daniel": {
         "email": "daniel@cwlagos.com",
         "password": "Listings@1234",
-        "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
+        "proxy_url": "http://1ba810eefd20927d:HIXnc1UtVE4u9r6q@res.proxy-seller.com:10000"
     },
     "npc_cw": {
         "email": "hello@cwlagos.com",
         "password": "Listings@1234",
-        "proxy_url": "http://b2ff1e853ef6c57a:bg2WA1iQu9y4fI3F@res.proxy-seller.com:10000"
+        "proxy_url": "http://1ba810eefd20927d:HIXnc1UtVE4u9r6q@res.proxy-seller.com:10000"
     },
     "airtable": {
         "token": "patYRSlAoegACNY0G.a570b143f611e31e0203e31af4524821e706d3e8bb59b181bc14871c35c6f8c5"
     },
     "anthropic": {
-        "api_key": "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"
+        "api_key": "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"
     }
 }
 
