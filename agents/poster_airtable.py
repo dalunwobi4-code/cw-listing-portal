@@ -101,8 +101,8 @@ PROPERTY_TYPE_MAP = {
     "Bungalow":             "Detached Duplex",
     "House":                "Detached Duplex",
     "Penthouse":            "Penthouse",
-    # Land subtypes
-    "Mixed Use Land":       "Mixed Use Land",
+    # Land subtypes — must match Airtable field fld1oBDXpXaOVSHqV exactly (hyphen in Mixed-Use)
+    "Mixed-Use Land":       "Mixed-Use Land",
     "Commercial Land":      "Commercial Land",
     "Residential Land":     "Residential Land",
     "Joint Venture":        "Joint Venture",
@@ -177,7 +177,9 @@ def create_record(token: str, prop: dict) -> str:
     }
 
     # Listing Status (linked record) — derive from property_type so edits carry through
-    is_land = prop.get("property_type", "") == "Land"
+    _LAND_TYPES = {"Land", "Mixed-Use Land", "Commercial Land", "Residential Land",
+                   "Industrial Land", "Joint Venture"}
+    is_land = prop.get("is_land", False) or prop.get("property_type", "") in _LAND_TYPES
     status_key = "land" if is_land else mode
     status_id = LISTING_STATUS.get(status_key)
     if status_id:
@@ -210,10 +212,21 @@ def create_record(token: str, prop: dict) -> str:
         fields["Price Range"] = _price_range(int(price))
 
     # Property Type (singleSelect)
-    type_key = prop.get("land_subtype", "Mixed Use Land") if is_land else ptype
+    if is_land:
+        # land tab sends property_type as the subtype directly (e.g. "Mixed-Use Land")
+        # regular flow sends property_type="Land" and land_subtype separately
+        type_key = ptype if ptype in PROPERTY_TYPE_MAP else prop.get("land_subtype", "Mixed-Use Land")
+    else:
+        type_key = ptype
     airtable_type = PROPERTY_TYPE_MAP.get(type_key)
     if airtable_type:
         fields["Property Type"] = airtable_type
+
+    # Land Size (only for land listings)
+    if is_land:
+        size_sqm = prop.get("size_sqm", 0)
+        if size_sqm:
+            fields["Land Size"] = f"{int(size_sqm):,} sqm"
 
     # Agent (linked record)
     agent_id = prop.get("agent_id")
@@ -334,8 +347,59 @@ def post_property(prop: dict, image_paths: list, credentials: dict) -> dict:
 
         result["record_id"] = record_id
 
+        # Optional tracking fields — PATCH separately so unknown fields never break record creation
+        _tracking = {}
+        _pb = prop.get("posted_by", "")
+        if _pb:
+            _tracking["Posted By"] = _pb
+        _plt_map = {"npc_cw": "NPC CW ID", "npc_daniel": "NPC Daniel ID",
+                    "ppng": "PP Nigeria ID", "propertypro": "PropertyPro ID"}
+        for _pk, _fn in _plt_map.items():
+            _v = prop.get("platform_ids", {}).get(_pk, "")
+            if _v:
+                _tracking[_fn] = str(_v)
+        if _tracking:
+            try:
+                requests.patch(
+                    f"{API}/{BASE_ID}/{TABLE}/{record_id}",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json={"fields": _tracking},
+                    timeout=10
+                )
+            except Exception:
+                pass
+
+        # Land cards: write thumb + OG card via URL PATCH, then real photos → Image 1..7
+        _is_land = prop.get("is_land", False)
+        thumb_card_url = prop.get("land_card_url", "")
+        og_card_url    = prop.get("land_og_url", "")
+        card_hash      = prop.get("land_card_hash", "")
+        pid_lower      = prop.get("ref", "").lower()
+        if _is_land and thumb_card_url:
+            try:
+                card_patch = {}
+                thumb_name = f"land-thumb-{pid_lower}-{card_hash}.jpg"
+                og_name    = f"land-og-{pid_lower}-{card_hash}.jpg"
+                card_patch["Thumbnail Image"] = [{"url": thumb_card_url, "filename": thumb_name}]
+                if og_card_url:
+                    card_patch["Share Card Image"] = [{"url": og_card_url, "filename": og_name}]
+                requests.patch(
+                    f"{API}/{BASE_ID}/{TABLE}/{record_id}",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json={"fields": card_patch},
+                    timeout=15
+                )
+                print(f"  [AIRTABLE] Land card PATCHed for {prop.get('ref')}")
+            except Exception as _ce:
+                print(f"  [AIRTABLE] Card PATCH failed: {_ce}")
+
         # Upload images into slots (max 8)
-        slots = IMAGE_SLOT_ORDER[:len(image_paths)]
+        # Land: skip Thumbnail Image slot (card already written via URL PATCH)
+        if _is_land and thumb_card_url:
+            photo_slots = [s for s in IMAGE_SLOT_ORDER if s != "Thumbnail Image"]
+        else:
+            photo_slots = IMAGE_SLOT_ORDER
+        slots = photo_slots[:len(image_paths)]
         uploaded = 0
 
         for slot_name, img_path in zip(slots, image_paths):

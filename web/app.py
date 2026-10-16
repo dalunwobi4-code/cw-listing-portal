@@ -82,6 +82,122 @@ PLATFORM_LABELS = {
     "airtable":    "Airtable",
 }
 
+TEAM_MEMBERS = ["Maryann", "Tumi", "Nancy"]
+TEAM_PIN     = "0000"
+
+# ── Cloudinary land card URL builders (ported from cw-framer-sync/land-card.js) ──
+
+import hashlib
+from urllib.parse import quote as _url_quote
+
+_CLD_CLOUD    = "lssset6f"
+_CLD_BASE     = "land-base"
+_CLD_OVERLAY  = "land-overlay-v3"
+_CLD_OG_OVERLAY = "land-overlay-og"
+_CLD_PAD      = 120
+
+
+def _land_enc(s: str) -> str:
+    encoded = _url_quote(str(s), safe='')
+    return encoded.replace('%2C', '%252C').replace('%2F', '%252F')
+
+
+def _format_land_size(raw: str) -> str:
+    """'1400 sqm' / '9,000 sqm' / '600' -> '1,400 sqm'."""
+    import re as _re
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    m = _re.match(r'^([\d,]*\.?\d+)\s*(.*)$', s)
+    if not m:
+        return s
+    n = float(m.group(1).replace(",", ""))
+    unit = m.group(2).strip()
+    if _re.search(r'\d', unit):
+        return s
+    if not unit or _re.match(r'^(sqm|sq\.?\s?m(eters?|etres?)?|m2|m²|square met(er|re)s?)\.?$', unit, _re.IGNORECASE):
+        unit = "sqm"
+    return f"{int(n):,} {unit}"
+
+
+def _clip(s: str, n: int) -> str:
+    return s[:n - 1].rstrip() + "…" if len(s) > n else s
+
+
+def build_land_card_url(fields: dict, base_id: str = _CLD_BASE) -> str:
+    title = _clip(str(fields.get("Property Title") or "").strip(), 96)
+    size  = _format_land_size(fields.get("Land Size") or "")
+    price = str(fields.get("New Price") or "").strip()
+    loc_raw = fields.get("Main Neighbourhood Label") or ""
+    loc   = str(loc_raw[0] if isinstance(loc_raw, list) else loc_raw).strip()
+    ptype_raw = fields.get("Property Type") or ""
+    ptype = str(ptype_raw[0] if isinstance(ptype_raw, list) else ptype_raw).strip()
+    PAD   = _CLD_PAD
+    parts = [
+        f"https://res.cloudinary.com/{_CLD_CLOUD}/image/upload",
+        "c_fill,w_1536,h_1024,g_auto",
+        f"l_{_CLD_OVERLAY},g_north_west,x_0,y_0",
+        f"l_text:Montserrat_28_bold_letter_spacing_3:%2520LAND%2520FOR%2520SALE%2520,co_white,b_rgb:e5484d,g_north_west,x_{PAD},y_76",
+    ]
+    if ptype:
+        parts.append(f"l_text:Montserrat_26_bold_letter_spacing_2:%2520{_land_enc(ptype.upper())}%2520,co_white,b_rgb:0f1729,g_north_east,x_{PAD},y_76")
+    if loc:
+        parts.append(f"l_text:Montserrat_36_semibold:{_land_enc(loc)}%252C%2520Lagos,co_rgb:f1f4fa,g_north_west,x_{PAD},y_150")
+    if title:
+        parts.append(f"l_text:Montserrat_46_semibold:{_land_enc(title)},co_white,g_south_west,x_{PAD},y_410,w_1250,c_fit")
+    if size:
+        parts.append(f"l_text:Montserrat_104_bold:{_land_enc(size)},co_white,g_south_west,x_{PAD},y_268")
+        if price:
+            parts.append(f"l_text:Montserrat_66_bold:{_land_enc(price)},co_rgb:ff6b6f,g_south_west,x_{PAD},y_176")
+    elif price:
+        parts.append(f"l_text:Montserrat_96_bold:{_land_enc(price)},co_white,g_south_west,x_{PAD},y_246")
+    parts += [
+        f"l_text:Montserrat_24_bold_letter_spacing_3:CW%2520REAL%2520ESTATE,co_white,g_south_west,x_{PAD},y_52",
+        f"l_text:Montserrat_24_regular:cwlagos.com,co_rgb:c3cad9,g_south_east,x_{PAD},y_52",
+        "q_auto",
+        f"{base_id}.jpg",
+    ]
+    return "/".join(parts)
+
+
+def build_land_og_card_url(fields: dict, base_id: str = _CLD_BASE) -> str:
+    title = _clip(str(fields.get("Property Title") or "").strip(), 80)
+    size  = _format_land_size(fields.get("Land Size") or "")
+    price = str(fields.get("New Price") or "").strip()
+    loc_raw = fields.get("Main Neighbourhood Label") or ""
+    loc   = str(loc_raw[0] if isinstance(loc_raw, list) else loc_raw).strip()
+    ptype_raw = fields.get("Property Type") or ""
+    ptype = str(ptype_raw[0] if isinstance(ptype_raw, list) else ptype_raw).strip()
+    parts = [
+        f"https://res.cloudinary.com/{_CLD_CLOUD}/image/upload",
+        "c_fill,w_1200,h_630,g_auto",
+        f"l_{_CLD_OG_OVERLAY},g_north_west,x_0,y_0",
+        f"l_text:Montserrat_22_bold_letter_spacing_3:%2520LAND%2520FOR%2520SALE%2520,co_white,b_rgb:e5484d,g_north_west,x_56,y_48",
+    ]
+    if ptype:
+        parts.append(f"l_text:Montserrat_20_bold_letter_spacing_2:%2520{_land_enc(ptype.upper())}%2520,co_white,b_rgb:0f1729,g_north_east,x_56,y_48")
+    if title:
+        parts.append(f"l_text:Montserrat_34_semibold:{_land_enc(title)},co_white,g_south_west,x_56,y_290,w_1080,c_fit")
+    if size:
+        parts.append(f"l_text:Montserrat_84_bold:{_land_enc(size)},co_white,g_south_west,x_56,y_180")
+        if price:
+            parts.append(f"l_text:Montserrat_48_bold:{_land_enc(price)},co_rgb:ff6b6f,g_south_west,x_56,y_118")
+    elif price:
+        parts.append(f"l_text:Montserrat_76_bold:{_land_enc(price)},co_white,g_south_west,x_56,y_170")
+    if loc:
+        parts.append(f"l_text:Montserrat_28_semibold:{_land_enc(loc)}%252C%2520Lagos,co_rgb:e3e8f2,g_south_west,x_56,y_70")
+    parts += [
+        f"l_text:Montserrat_19_bold_letter_spacing_3:CW%2520REAL%2520ESTATE,co_white,g_south_west,x_56,y_32",
+        f"l_text:Montserrat_19_regular:cwlagos.com,co_rgb:c3cad9,g_south_east,x_56,y_32",
+        "q_auto",
+        f"{base_id}.jpg",
+    ]
+    return "/".join(parts)
+
+
+def land_card_hash(url: str) -> str:
+    return hashlib.sha1(url.encode()).hexdigest()[:12]
+
 AIRTABLE_BASE_ID = "appui0GIVsqalToEa"
 _PID_LOCK = threading.Lock()  # prevents two simultaneous jobs getting the same PID
 AIRTABLE_TABLE   = "Lagos Properties"
@@ -152,7 +268,11 @@ def get_next_land_pid() -> str:
 
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
 
-LOCATIONS = ["Lekki Phase 1", "Victoria Island", "Ikoyi", "Lekki"]
+LOCATIONS = [
+    "Lekki Phase 1", "Victoria Island", "Ikoyi", "Lekki",
+    "Oniru", "Banana Island", "Old Ikoyi", "Eko Atlantic",
+    "Chevron Drive", "VGC", "Osapa London", "Ajah",
+]
 
 # Aliases map common spelling variants → canonical location name.
 # Order matters: more specific entries must come before substrings they contain.
@@ -163,9 +283,20 @@ _LOC_ALIASES = {
     "lekki ph 1":      "Lekki Phase 1",
     "lekki ph1":       "Lekki Phase 1",
     "phase 1 lekki":   "Lekki Phase 1",
+    "banana island":   "Banana Island",
+    "old ikoyi":       "Old Ikoyi",
+    "eko atlantic":    "Eko Atlantic",
+    "chevron drive":   "Chevron Drive",
+    "chevron":         "Chevron Drive",
+    "victoria garden": "VGC",
+    "vgc":             "VGC",
+    "osapa london":    "Osapa London",
+    "osapa":           "Osapa London",
+    "oniru":           "Oniru",
     "victoria island": "Victoria Island",
     "v.i.":            "Victoria Island",
     "v/i":             "Victoria Island",
+    "ajah":            "Ajah",
     "ikoyi":           "Ikoyi",
     "lekki":           "Lekki",
 }
@@ -188,13 +319,21 @@ _PTYPE_ALIASES = {
     "semi detached":        "Semi-detached Duplex",
     "terraced duplex":      "Terraced Duplex",
     "terrace duplex":       "Terraced Duplex",
+    "terraced house":       "Terraced Duplex",
+    "terrace house":        "Terraced Duplex",
+    "terraced":             "Terraced Duplex",
+    "terrace":              "Terraced Duplex",
     "detached duplex":      "Detached Duplex",
+    "detached house":       "Detached Duplex",
+    "detached bungalow":    "Bungalow",
+    "flat":                 "Apartment",
+    "apartment":            "Apartment",
 }
 FEATURE_KEYWORDS = {
     "All Room Ensuite":   ["all room ensuite", "all rooms ensuite", "en-suite", "ensuite"],
     "Swimming Pool":      ["swimming pool", "pool"],
     "24 Hours Security":  ["24.hour security", "24hrs security", "24 hour security",
-                           "round the clock security", "security"],
+                           "24 hours security", "round the clock security", "security"],
     "Generator":          ["generator", "gen set", "diesel generator"],
     "Boys Quarter":       ["boys quarter", "bq", "boy's quarter"],
     "Elevator":           ["elevator", "lift"],
@@ -296,7 +435,7 @@ def parse_description(text: str) -> dict:
             size_sqm = int(float(sqm_m.group(1).replace(",", "")))
 
     # ── land subtype (for Airtable) ───────────────────────────────────────
-    land_subtype = "Mixed Use Land"
+    land_subtype = "Mixed-Use Land"
     if is_land:
         if re.search(r"\bcommercial\b", t_low):
             land_subtype = "Commercial Land"
@@ -753,9 +892,10 @@ def emit(q, event_type, data):
     q.put({"type": event_type, **data})
 
 
-def run_job(job_id, prop, platforms, raw_image_paths):
+def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
     q = JOBS[job_id]["events"]
     airtable_selected = False
+    platform_ids = {}
     try:
         emit(q, "log", {"msg": f"Getting next Property ID from Airtable…"})
         with _PID_LOCK:
@@ -833,6 +973,10 @@ def run_job(job_id, prop, platforms, raw_image_paths):
             for fut in concurrent.futures.as_completed(futures):
                 platform, result = fut.result()
                 done += 1
+                # Collect platform listing IDs for Airtable record
+                lid = result.get("listing_id", "")
+                if lid:
+                    platform_ids[platform] = str(lid)
                 emit(q, "result", {
                     "ref":      pid,
                     "platform": platform,
@@ -853,6 +997,9 @@ def run_job(job_id, prop, platforms, raw_image_paths):
 
         # Step 3 — Airtable in background, sends its result then closes stream
         if airtable_selected:
+            # Attach metadata before Airtable record is created
+            prop["posted_by"]    = posted_by
+            prop["platform_ids"] = platform_ids
             def _airtable_bg():
                 try:
                     platform, result = post_one("airtable")
@@ -880,6 +1027,163 @@ def run_job(job_id, prop, platforms, raw_image_paths):
         JOBS[job_id]["done"] = True
         if not airtable_selected:
             q.put(None)  # only close stream here if Airtable isn't running in background
+
+
+def run_land_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
+    """Post a land listing: build Cloudinary card, download as cover, post everywhere."""
+    q = JOBS[job_id]["events"]
+    airtable_selected = False
+    platform_ids = {}
+    try:
+        emit(q, "log", {"msg": "Getting next Land Property ID from Airtable…"})
+        with _PID_LOCK:
+            pid = get_next_land_pid()
+        prop["ref"]     = pid
+        prop["is_land"] = True
+        emit(q, "pid", {"pid": pid})
+        emit(q, "log", {"msg": f"Property ID: {pid}"})
+
+        # ── Build Cloudinary land card URLs ──────────────────────────────────
+        cld_fields = {
+            "Property Title":           prop.get("title", ""),
+            "Land Size":                f"{int(prop['size_sqm']):,} sqm" if prop.get("size_sqm") else "",
+            "New Price":                prop.get("price_str", ""),
+            "Main Neighbourhood Label": [prop.get("location", "")],
+            "Property Type":            prop.get("property_type", "Mixed-Use Land"),
+        }
+        thumb_url = build_land_card_url(cld_fields)
+        og_url    = build_land_og_card_url(cld_fields)
+        card_hash = land_card_hash(thumb_url)
+        prop["land_card_url"]  = thumb_url
+        prop["land_og_url"]    = og_url
+        prop["land_card_hash"] = card_hash
+        emit(q, "log", {"msg": "Land card URL built."})
+
+        # ── Download card JPEG → used as cover photo for NPC/PP ──────────────
+        card_dir = BASE_DIR / "enhanced" / pid
+        card_dir.mkdir(parents=True, exist_ok=True)
+        card_path = str(card_dir / f"land-card-{pid.lower()}.jpg")
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(thumb_url, card_path)
+            emit(q, "log", {"msg": "Land card downloaded."})
+        except Exception as _e:
+            emit(q, "log", {"msg": f"  Card download failed: {_e}"})
+            card_path = None
+
+        # ── Enhance real photos ───────────────────────────────────────────────
+        enh_dir = card_dir
+        enhanced = []
+        if raw_image_paths:
+            emit(q, "log", {"msg": f"Enhancing {len(raw_image_paths)} images to HD…"})
+            for src in raw_image_paths:
+                edest = enh_dir / (Path(src).stem + ".jpg")
+                try:
+                    enhance_image(src, str(edest))
+                    enhanced.append(str(edest))
+                except Exception as e:
+                    emit(q, "log", {"msg": f"  Enhance failed ({Path(src).name}): {e}"})
+                    enhanced.append(src)
+
+        # ── Watermark real photos ─────────────────────────────────────────────
+        wm_dir = BASE_DIR / "watermarked" / pid
+        wm_dir.mkdir(parents=True, exist_ok=True)
+        watermarked = []
+        if enhanced:
+            emit(q, "log", {"msg": "Watermarking photos…"})
+            for i, src in enumerate(enhanced):
+                dest = wm_dir / Path(src).name
+                if i == 0:
+                    try:
+                        apply_watermark(src, str(dest), WATERMARK_LOGO, opacity=1.0)
+                        watermarked.append(str(dest))
+                    except Exception as e:
+                        emit(q, "log", {"msg": f"  Watermark failed: {e}"})
+                        watermarked.append(src)
+                else:
+                    import shutil
+                    shutil.copy2(src, str(dest))
+                    watermarked.append(str(dest))
+
+        # NPC/PP: card first (= cover), then agent-uploaded photos
+        npc_pp_images = ([card_path] if card_path else []) + watermarked
+
+        JOBS[job_id]["prop"]        = prop
+        JOBS[job_id]["watermarked"] = npc_pp_images
+
+        import concurrent.futures
+        main_platforms    = [p for p in platforms if p != "airtable"]
+        airtable_selected = "airtable" in platforms
+        total = len(main_platforms) + (1 if airtable_selected else 0)
+        done  = 0
+
+        def post_one_land(platform):
+            poster = PLATFORM_POSTERS[platform]
+            creds  = CREDENTIALS[platform]
+            emit(q, "log", {"msg": f"  [{PLATFORM_LABELS[platform]}] posting…"})
+            if platform == "airtable":
+                imgs = enhanced  # real photos; card written via URL PATCH inside poster
+                p    = prop
+            else:
+                imgs = npc_pp_images  # card first → NPC cover
+                p    = dict(prop)
+                p["description"] = f"{pid}\n{prop.get('description', '')}"
+            return platform, poster(p, imgs, creds)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(len(main_platforms), 1)) as ex:
+            futures = {ex.submit(post_one_land, p): p for p in main_platforms}
+            for fut in concurrent.futures.as_completed(futures):
+                platform, result = fut.result()
+                done += 1
+                lid = result.get("listing_id", "")
+                if lid:
+                    platform_ids[platform] = str(lid)
+                emit(q, "result", {
+                    "ref":      pid,
+                    "platform": platform,
+                    "label":    PLATFORM_LABELS[platform],
+                    "success":  result.get("success", False),
+                    "url":      result.get("listing_url", ""),
+                    "images":   result.get("images_uploaded", 0),
+                    "error":    result.get("error", ""),
+                    "progress": round(done / total * 100),
+                })
+
+        if airtable_selected:
+            emit(q, "partial_done", {"msg": "Posted ✓ — Airtable uploading images…"})
+        else:
+            emit(q, "done", {"msg": "All done!"})
+
+        if airtable_selected:
+            prop["posted_by"]    = posted_by
+            prop["platform_ids"] = platform_ids
+            def _airtable_bg():
+                try:
+                    platform, result = post_one_land("airtable")
+                    emit(q, "result", {
+                        "ref":      pid,
+                        "platform": platform,
+                        "label":    PLATFORM_LABELS[platform],
+                        "success":  result.get("success", False),
+                        "url":      result.get("listing_url", ""),
+                        "images":   result.get("images_uploaded", 0),
+                        "error":    result.get("error", ""),
+                        "progress": 100,
+                    })
+                    emit(q, "done", {"msg": "All done!"})
+                except Exception as e:
+                    emit(q, "error", {"msg": f"Airtable: {e}"})
+                finally:
+                    JOBS[job_id]["done"] = True
+                    q.put(None)
+            threading.Thread(target=_airtable_bg, daemon=True).start()
+
+    except Exception as e:
+        emit(q, "error", {"msg": str(e)})
+    finally:
+        JOBS[job_id]["done"] = True
+        if not airtable_selected:
+            q.put(None)
 
 
 # ── routes ───────────────────────────────────────────────────────────────────
@@ -924,12 +1228,118 @@ def upload_images():
     return jsonify({"saved": saved, "count": len(saved)})
 
 
+@app.route("/login", methods=["GET"])
+def login_page():
+    return render_template("login.html", team_members=TEAM_MEMBERS)
+
+
+@app.route("/api/verify-pin", methods=["POST"])
+def verify_pin():
+    body = request.get_json() or {}
+    user = body.get("user", "").strip()
+    pin  = body.get("pin", "").strip()
+    if user not in TEAM_MEMBERS:
+        return jsonify({"ok": False, "error": "Unknown user"}), 403
+    if pin != TEAM_PIN:
+        return jsonify({"ok": False, "error": "Wrong PIN"}), 403
+    return jsonify({"ok": True, "user": user})
+
+
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
+
+
+@app.route("/api/listings")
+def api_listings():
+    """Return listings from Airtable, optionally filtered by Posted By."""
+    user  = request.args.get("user", "").strip()
+    limit = min(int(request.args.get("limit", 50)), 200)
+
+    url     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
+    headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
+    fields  = [
+        "Property ID", "Property Title", "New Price", "Posted By",
+        "NPC CW ID", "NPC Daniel ID", "PP Nigeria ID", "PropertyPro ID",
+        "Property Link",
+    ]
+    params  = {
+        "maxRecords": limit,
+        "sort[0][field]": "Created Time",
+        "sort[0][direction]": "desc",
+    }
+    for i, f in enumerate(fields):
+        params[f"fields[{i}]"] = f
+    if user and user != "all":
+        params["filterByFormula"] = f"{{Posted By}}='{user}'"
+
+    try:
+        r    = req.get(url, headers=headers, params=params, timeout=15)
+        data = r.json()
+        records = []
+        for rec in data.get("records", []):
+            f = rec.get("fields", {})
+            records.append({
+                "id":           rec["id"],
+                "created":      rec.get("createdTime", ""),
+                "ref":          f.get("Property ID", ""),
+                "title":        f.get("Property Title", ""),
+                "price":        f.get("New Price", ""),
+                "posted_by":    f.get("Posted By", ""),
+                "npc_cw_id":    f.get("NPC CW ID", ""),
+                "npc_daniel_id":f.get("NPC Daniel ID", ""),
+                "ppng_id":      f.get("PP Nigeria ID", ""),
+                "propertypro_id":f.get("PropertyPro ID", ""),
+                "cwlagos_url":  f.get("Property Link", ""),
+            })
+        return jsonify({"records": records})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/weekly-report")
+def api_weekly_report():
+    """Return this week's listing stats per team member."""
+    from datetime import datetime, timedelta
+    today   = datetime.utcnow()
+    monday  = today - timedelta(days=today.weekday())
+    monday  = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+    iso_mon = monday.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    url     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
+    headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
+    params  = {
+        "filterByFormula": f"IS_AFTER(CREATED_TIME(), '{iso_mon}')",
+        "fields[0]": "Property ID",
+        "fields[1]": "Posted By",
+        "maxRecords": 500,
+    }
+    try:
+        r    = req.get(url, headers=headers, params=params, timeout=15)
+        data = r.json()
+        counts = {m: 0 for m in TEAM_MEMBERS}
+        total  = 0
+        for rec in data.get("records", []):
+            poster = rec.get("fields", {}).get("Posted By", "")
+            total += 1
+            if poster in counts:
+                counts[poster] += 1
+        return jsonify({
+            "week_start": monday.strftime("%b %d"),
+            "total":      total,
+            "by_member":  counts,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/start-job", methods=["POST"])
 def start_job():
     body       = request.get_json() or {}
     prop       = body.get("property", {})
     platforms  = body.get("platforms", list(PLATFORM_POSTERS.keys()))
     session_id = body.get("session_id", "default")
+    posted_by  = body.get("posted_by", "")
 
     if not prop.get("title"):
         return jsonify({"error": "no property data — parse a description first"}), 400
@@ -947,7 +1357,7 @@ def start_job():
     JOBS[job_id] = {"events": queue.Queue(), "done": False}
     threading.Thread(
         target=run_job,
-        args=(job_id, prop, platforms, raw_paths),
+        args=(job_id, prop, platforms, raw_paths, posted_by),
         daemon=True
     ).start()
 
@@ -1030,6 +1440,45 @@ def retry_platform():
             "images":   0,
             "error":    str(e),
         })
+
+
+@app.route("/land")
+def land():
+    return render_template("land.html")
+
+
+@app.route("/start-land-job", methods=["POST"])
+def start_land_job():
+    data        = request.get_json()
+    prop        = data.get("property", {})
+    platforms   = data.get("platforms", [])
+    session_id  = data.get("session_id", "")
+    posted_by   = data.get("posted_by", "")
+
+    if not platforms:
+        return jsonify({"error": "No platforms selected"}), 400
+
+    # Collect uploaded images for this session
+    raw_image_paths = []
+    if session_id:
+        sess_dir = UPLOADS_DIR / session_id
+        if sess_dir.exists():
+            raw_image_paths = sorted(
+                str(p) for p in sess_dir.iterdir()
+                if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+            )
+
+    job_id = str(uuid.uuid4())
+    q = queue.Queue()
+    JOBS[job_id] = {"events": q, "done": False, "prop": None, "watermarked": []}
+
+    threading.Thread(
+        target=run_land_job,
+        args=(job_id, prop, platforms, raw_image_paths, posted_by),
+        daemon=True,
+    ).start()
+
+    return jsonify({"job_id": job_id})
 
 
 if __name__ == "__main__":

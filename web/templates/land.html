@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CW Lagos — Land Listing Portal</title>
+<style>
+:root {
+  --bg: #0d0d0d; --card: #161616; --border: #2a2a2a;
+  --accent: #f5c518; --purple: #7c5cfc;
+  --text: #f0f0f0; --muted: #777;
+  --green: #22c55e; --red: #ef4444;
+  --r: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 60px; }
+header { display: flex; align-items: center; gap: 14px; padding: 20px 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+.logo { width: 38px; height: 38px; background: var(--green); border-radius: 9px; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #000; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 700; }
+header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.cols { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 780px) { .cols { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 22px; }
+.card + .card { margin-top: 16px; }
+.card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.field-row.full { grid-template-columns: 1fr; }
+.field-row.third { grid-template-columns: 1fr 1fr 1fr; }
+.fl { display: flex; flex-direction: column; gap: 4px; }
+.fl label { font-size: 11px; color: var(--muted); }
+.edit-field {
+  width: 100%; padding: 9px 11px; background: #111; border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text); font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .15s; font-weight: 600;
+}
+.edit-field:focus { border-color: var(--accent); }
+.edit-select {
+  appearance: none; cursor: pointer; padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%23777' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+.edit-select option { background: #1a1a1a; }
+.edit-textarea { resize: vertical; font-weight: 400; line-height: 1.6; min-height: 120px; }
+.price-row { display: flex; gap: 8px; align-items: center; }
+.price-row input[type=number] { flex: 1; }
+.price-mode { display: flex; gap: 6px; align-items: center; }
+.price-mode label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.price-mode input[type=radio] { accent-color: var(--accent); }
+.dz {
+  border: 2px dashed var(--border); border-radius: var(--r);
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: border-color .15s, background .15s; position: relative;
+}
+.dz:hover, .dz.over { border-color: var(--accent); background: rgba(245,197,24,.03); }
+.dz input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dz-icon { font-size: 30px; }
+.dz-text { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.dz-text strong { color: var(--text); }
+.thumb-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.thumb { width: 58px; height: 58px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
+.img-count { font-size: 12px; color: var(--accent); margin-top: 8px; font-weight: 600; }
+.plat-list { display: flex; flex-direction: column; gap: 8px; }
+.plat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 13px; background: #111; border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; user-select: none; transition: border-color .12s;
+}
+.plat-row.on { border-color: var(--purple); background: #1a1630; }
+.plat-row input { display: none; }
+.plat-name { font-weight: 600; font-size: 13px; }
+.plat-url  { font-size: 11px; color: var(--muted); }
+.toggle { width: 36px; height: 20px; background: var(--border); border-radius: 10px; position: relative; transition: background .15s; flex-shrink: 0; }
+.toggle.on { background: var(--purple); }
+.toggle::after { content: ''; position: absolute; width: 14px; height: 14px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .15s; }
+.toggle.on::after { left: 19px; }
+.post-btn {
+  width: 100%; padding: 14px; background: var(--green); color: #000;
+  font-size: 15px; font-weight: 800; border: none; border-radius: var(--r);
+  cursor: pointer; transition: opacity .15s; margin-top: 16px;
+  letter-spacing: .01em;
+}
+.post-btn:hover { opacity: .9; }
+.post-btn:disabled { opacity: .35; cursor: not-allowed; }
+.agent-select {
+  width: 100%; padding: 10px 12px; background: #111; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit;
+  outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23777' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px; transition: border-color .15s;
+}
+.agent-select:focus { border-color: var(--accent); }
+.agent-select option { background: #1a1a1a; }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#jobs-section { margin-top: 32px; display: flex; flex-direction: column; gap: 16px; }
+.job-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; }
+.job-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.job-title { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+.job-pid { font-size: 11px; color: var(--green); font-weight: 700; }
+.pbar-wrap { background: #1e1e1e; border-radius: 4px; height: 5px; margin: 10px 0 16px; overflow: hidden; }
+.pbar { height: 100%; background: var(--purple); border-radius: 4px; transition: width .3s; width: 0%; }
+.result-list { display: flex; flex-direction: column; gap: 6px; }
+.rrow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; background: #111; border-radius: 7px; font-size: 12px;
+  border-left: 3px solid var(--border);
+}
+.rrow.ok  { border-left-color: var(--green); }
+.rrow.err { border-left-color: var(--red); }
+.rrow .r-left { display: flex; flex-direction: column; gap: 2px; }
+.rrow .r-plat { font-weight: 700; }
+.rrow .r-link { color: var(--accent); text-decoration: none; font-size: 11px; }
+.rrow .r-link:hover { text-decoration: underline; }
+.rrow .r-err { color: var(--red); font-size: 11px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.badge.ok  { background: rgba(34,197,94,.15); color: var(--green); }
+.badge.err { background: rgba(239,68,68,.15); color: var(--red); }
+.log-box { font-size: 11px; color: var(--muted); font-family: monospace; max-height: 90px; overflow-y: auto; line-height: 1.6; margin-top: 10px; }
+.done-banner { margin-top: 12px; text-align: center; padding: 12px; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); border-radius: 8px; color: var(--green); font-weight: 700; display: none; }
+.done-banner.show { display: block; }
+.airtable-notice { font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic; }
+.nav-link { font-size: 12px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); padding: 4px 11px; border-radius: 20px; white-space: nowrap; }
+.nav-link:hover { color: var(--text); border-color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">🌿</div>
+    <div style="flex:1">
+      <h1>Land Listing Portal</h1>
+      <p>Structured land upload — card auto-generated, posted to all platforms</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <span id="user-name-badge" style="font-size:13px;font-weight:700;color:var(--accent)"></span>
+      <a href="/" class="nav-link">Properties</a>
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <button onclick="doLogout()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0">Logout</button>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- LEFT: land form -->
+    <div>
+
+      <!-- Core details -->
+      <div class="card">
+        <div class="card-title">Land Details</div>
+
+        <div class="field-row full">
+          <div class="fl">
+            <label>Title <span style="color:var(--muted);font-weight:400">(auto-suggested from fields below)</span></label>
+            <input class="edit-field" id="land-title" placeholder="e.g. 9,000 sqm Mixed-Use Land in Lekki Phase 1">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="fl">
+            <label>Land Subtype</label>
+            <select class="edit-field edit-select" id="land-subtype">
+              <option value="Mixed-Use Land">Mixed-Use Land</option>
+              <option value="Residential Land">Residential Land</option>
+              <option value="Commercial Land">Commercial Land</option>
+              <option value="Industrial Land">Industrial Land</option>
+              <option value="Joint Venture">Joint Venture</option>
+            </select>
+          </div>
+          <div class="fl">
+            <label>Title Document</label>
+            <select class="edit-field edit-select" id="land-title-doc">
+              <option value="">— Select —</option>
+              <option value="C of O">C of O (Certificate of Occupancy)</option>
+              <option value="Governor's Consent">Governor's Consent</option>
+              <option value="Registered Survey">Registered Survey</option>
+              <option value="Deed of Assignment">Deed of Assignment</option>
+              <option value="Excision">Excision</option>
+              <option value="Gazette">Gazette</option>
+              <option value="Freehold">Freehold</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="fl">
+            <label>Size (sqm)</label>
+            <input class="edit-field" id="land-size" type="number" min="1" placeholder="e.g. 9000" oninput="autoTitle()">
+          </div>
+          <div class="fl">
+            <label>Location</label>
+            <select class="edit-field edit-select" id="land-location" onchange="autoTitle()">
+              <option value="Lekki Phase 1">Lekki Phase 1</option>
+              <option value="Victoria Island">Victoria Island</option>
+              <option value="Ikoyi">Ikoyi</option>
+              <option value="Old Ikoyi">Old Ikoyi</option>
+              <option value="Banana Island">Banana Island</option>
+              <option value="Lekki">Lekki</option>
+              <option value="Oniru">Oniru</option>
+              <option value="Eko Atlantic">Eko Atlantic</option>
+              <option value="Chevron Drive">Chevron Drive</option>
+              <option value="VGC">VGC</option>
+              <option value="Osapa London">Osapa London</option>
+              <option value="Ajah">Ajah</option>
+              <option value="Ikate">Ikate</option>
+              <option value="Orchid">Orchid</option>
+              <option value="Idado">Idado</option>
+              <option value="Agungi">Agungi</option>
+              <option value="Sangotedo">Sangotedo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="fl">
+            <label>Price (₦)</label>
+            <input class="edit-field" id="land-price" type="number" min="0" placeholder="e.g. 1500000000">
+          </div>
+          <div class="fl">
+            <label>Price basis</label>
+            <div class="price-mode" style="padding-top:10px;gap:14px">
+              <label><input type="radio" name="price-mode" value="total" checked> Total</label>
+              <label><input type="radio" name="price-mode" value="per_sqm"> Per sqm</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-row full" style="margin-top:4px">
+          <div class="fl">
+            <label>Description</label>
+            <textarea class="edit-field edit-textarea" id="land-description" placeholder="Details about the land: access road, utilities, proximity to landmarks, any development potential…"></textarea>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Agent -->
+      <div class="card">
+        <div class="card-title">Agent</div>
+        <select class="agent-select" id="agent-select">
+          <option value="">Loading agents…</option>
+        </select>
+      </div>
+
+      <!-- Images -->
+      <div class="card">
+        <div class="card-title">Land Photos <span style="font-weight:400;text-transform:none;color:var(--muted)">(optional — Cloudinary card auto-added as cover)</span></div>
+        <div class="dz" id="drop-zone"
+             ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+          <input type="file" id="file-input" multiple accept="image/*,.heic,.heif" onchange="filesChosen(event)">
+          <div class="dz-icon">🌿</div>
+          <div class="dz-text"><strong>Click to choose</strong> or drag &amp; drop land photos</div>
+        </div>
+        <div class="thumb-row" id="thumb-row"></div>
+        <div class="img-count"  id="img-count"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: platforms + post -->
+    <div>
+
+      <div class="card">
+        <div class="card-title">Post to</div>
+        <div class="plat-list">
+          <label class="plat-row on" data-p="npc_cw">
+            <input type="checkbox" value="npc_cw" checked>
+            <div><div class="plat-name">CW NPC</div><div class="plat-url">nigeriapropertycentre.com</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="npc_daniel">
+            <input type="checkbox" value="npc_daniel" checked>
+            <div><div class="plat-name">Daniel NPC</div><div class="plat-url">nigeriapropertycentre.com</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="ppng">
+            <input type="checkbox" value="ppng" checked>
+            <div><div class="plat-name">PP Nigeria</div><div class="plat-url">privateproperty.ng</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="propertypro">
+            <input type="checkbox" value="propertypro" checked>
+            <div><div class="plat-name">PropertyPro</div><div class="plat-url">propertypro.ng</div></div>
+            <div class="toggle on"></div>
+          </label>
+          <label class="plat-row on" data-p="airtable">
+            <input type="checkbox" value="airtable" checked>
+            <div><div class="plat-name">Airtable</div><div class="plat-url">CW Lagos base</div></div>
+            <div class="toggle on"></div>
+          </label>
+        </div>
+
+        <button class="post-btn" id="post-btn" onclick="submitLandJob()">
+          Post Land Listing
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="jobs-section"></div>
+
+</div>
+
+<script>
+// ── auth ──────────────────────────────────────────────────────────────────
+(function() {
+  const s = JSON.parse(localStorage.getItem('cw_session') || 'null');
+  if (!s || !s.user) { window.location.replace('/login'); return; }
+  window._cwUser = s.user;
+  const badge = document.getElementById('user-name-badge');
+  if (badge) badge.textContent = s.user;
+})();
+function doLogout() { localStorage.removeItem('cw_session'); window.location.href = '/login'; }
+
+// ── agents ────────────────────────────────────────────────────────────────
+(async function loadAgents() {
+  try {
+    const agents = await (await fetch('/agents')).json();
+    const sel = document.getElementById('agent-select');
+    sel.innerHTML = '<option value="">— Select agent —</option>';
+    agents.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id; opt.textContent = a.name;
+      sel.appendChild(opt);
+    });
+  } catch (_) {
+    document.getElementById('agent-select').innerHTML = '<option value="">Could not load agents</option>';
+  }
+})();
+
+// ── platform toggles ──────────────────────────────────────────────────────
+document.querySelectorAll('.plat-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const cb = row.querySelector('input');
+    cb.checked = !cb.checked;
+    row.classList.toggle('on', cb.checked);
+    row.querySelector('.toggle').classList.toggle('on', cb.checked);
+  });
+});
+
+// ── auto-suggest title ────────────────────────────────────────────────────
+function autoTitle() {
+  const titleEl = document.getElementById('land-title');
+  if (titleEl.dataset.edited) return; // don't overwrite manual edits
+  const size = document.getElementById('land-size').value;
+  const loc  = document.getElementById('land-location').value;
+  if (size && loc) {
+    const n = parseInt(size, 10);
+    const formatted = isNaN(n) ? size : n.toLocaleString('en-US');
+    titleEl.value = `Land Measuring ${formatted}sqm in ${loc}`;
+  }
+}
+document.getElementById('land-title').addEventListener('input', function() {
+  this.dataset.edited = '1';
+});
+
+// ── images ────────────────────────────────────────────────────────────────
+let uploadedFiles = [];
+function dzOver(e)      { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
+function dzLeave()      { document.getElementById('drop-zone').classList.remove('over'); }
+function dzDrop(e)      { e.preventDefault(); dzLeave(); addFiles(e.dataTransfer.files); }
+function filesChosen(e) { addFiles(e.target.files); }
+function addFiles(fileList) {
+  uploadedFiles.push(...Array.from(fileList));
+  renderThumbs();
+}
+function renderThumbs() {
+  const row   = document.getElementById('thumb-row');
+  const count = document.getElementById('img-count');
+  row.innerHTML = '';
+  uploadedFiles.slice(0, 10).forEach(f => {
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.src = URL.createObjectURL(f);
+    row.appendChild(img);
+  });
+  if (uploadedFiles.length > 10) {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;align-items:center;color:var(--muted);font-size:12px;padding:0 4px';
+    d.textContent = `+${uploadedFiles.length - 10} more`;
+    row.appendChild(d);
+  }
+  count.textContent = uploadedFiles.length
+    ? `${uploadedFiles.length} photo${uploadedFiles.length > 1 ? 's' : ''} selected`
+    : '';
+}
+
+// ── format price for display ──────────────────────────────────────────────
+function fmtPrice(raw) {
+  const n = parseInt(raw, 10);
+  if (isNaN(n) || n === 0) return '';
+  if (n >= 1_000_000_000) return `₦${(n / 1_000_000_000).toFixed(n % 1_000_000_000 === 0 ? 0 : 2)}B`;
+  if (n >= 1_000_000)     return `₦${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  return `₦${n.toLocaleString('en-US')}`;
+}
+
+// ── submit ────────────────────────────────────────────────────────────────
+async function submitLandJob() {
+  const title    = document.getElementById('land-title').value.trim();
+  const subtype  = document.getElementById('land-subtype').value;
+  const sizeRaw  = document.getElementById('land-size').value;
+  const location = document.getElementById('land-location').value;
+  const priceRaw = document.getElementById('land-price').value;
+  const priceMode = document.querySelector('input[name="price-mode"]:checked').value;
+  const titleDoc = document.getElementById('land-title-doc').value;
+  const desc     = document.getElementById('land-description').value.trim();
+
+  if (!title)    { alert('Please enter a title.'); return; }
+  if (!sizeRaw)  { alert('Please enter the land size.'); return; }
+  if (!priceRaw) { alert('Please enter the price.'); return; }
+
+  const agentSel  = document.getElementById('agent-select');
+  const agentId   = agentSel.value;
+  const agentName = agentId ? agentSel.options[agentSel.selectedIndex].text : '';
+  if (!agentId) { alert('Please select an agent.'); return; }
+
+  const platforms = [...document.querySelectorAll('.plat-row input:checked')].map(c => c.value);
+  if (!platforms.length) { alert('Select at least one platform.'); return; }
+
+  const sizeNum  = parseInt(sizeRaw, 10) || 0;
+  const priceNum = parseInt(priceRaw, 10) || 0;
+
+  // Compute total price and per-sqm price
+  let totalPrice = priceNum;
+  let perSqmPrice = 0;
+  if (priceMode === 'per_sqm' && sizeNum > 0) {
+    totalPrice  = priceNum * sizeNum;
+    perSqmPrice = priceNum;
+  } else if (sizeNum > 0) {
+    perSqmPrice = Math.round(priceNum / sizeNum);
+  }
+
+  const priceStr = fmtPrice(totalPrice);
+
+  const prop = {
+    title,
+    property_type: subtype,
+    land_subtype:  subtype,
+    mode:          'sale',
+    size_sqm:      sizeNum,
+    price:         totalPrice,
+    price_str:     priceStr,
+    per_sqm_price: perSqmPrice,
+    location,
+    title_document: titleDoc,
+    description:   desc + (titleDoc ? `\n\nTitle: ${titleDoc}` : ''),
+    agent_id:      agentId,
+    agent_name:    agentName,
+    bedrooms:      0,
+    bathrooms:     0,
+    toilets:       0,
+    is_land:       true,
+  };
+
+  const postBtn   = document.getElementById('post-btn');
+  postBtn.disabled = true;
+  postBtn.innerHTML = '<span class="spin"></span>Uploading images…';
+
+  const sessionId = 'sess_' + Math.random().toString(36).slice(2, 10);
+
+  // Upload images if any
+  if (uploadedFiles.length) {
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    uploadedFiles.forEach(f => fd.append('images', f));
+    try {
+      const upRes = await fetch('/upload-images', { method: 'POST', body: fd });
+      if (!upRes.ok) {
+        const go = confirm(`Image upload failed (${upRes.status}). Post without images?`);
+        if (!go) { postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
+      }
+    } catch (upErr) {
+      const go = confirm(`Image upload error: ${upErr.message}. Post without images?`);
+      if (!go) { postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
+    }
+  }
+
+  postBtn.innerHTML = '<span class="spin"></span>Posting…';
+
+  const res = await fetch('/start-land-job', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ property: prop, platforms, session_id: sessionId, posted_by: window._cwUser || '' }),
+  });
+  const { job_id, error } = await res.json();
+  if (error) { alert(error); postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
+
+  resetForm();
+  spawnJobCard(job_id, title, platforms);
+}
+
+function resetForm() {
+  document.getElementById('land-title').value = '';
+  document.getElementById('land-title').dataset.edited = '';
+  document.getElementById('land-size').value  = '';
+  document.getElementById('land-price').value = '';
+  document.getElementById('land-description').value = '';
+  document.getElementById('land-title-doc').value = '';
+  document.getElementById('land-subtype').value = 'Mixed-Use Land';
+  uploadedFiles = [];
+  renderThumbs();
+  document.getElementById('post-btn').disabled = false;
+  document.getElementById('post-btn').textContent = 'Post Land Listing';
+}
+
+// ── job card ──────────────────────────────────────────────────────────────
+function spawnJobCard(jobId, title, platforms) {
+  const section = document.getElementById('jobs-section');
+  const card    = document.createElement('div');
+  card.className = 'job-card';
+  card.id = `job-${jobId}`;
+  card.innerHTML = `
+    <div class="job-card-header">
+      <span class="job-title">${escHtml(title)}</span>
+      <span class="job-pid" id="jpid-${jobId}">getting ID…</span>
+    </div>
+    <div class="pbar-wrap"><div class="pbar" id="jpbar-${jobId}" style="width:0%"></div></div>
+    <div class="result-list" id="jresults-${jobId}"></div>
+    <div class="log-box"     id="jlog-${jobId}"></div>
+    <div class="done-banner" id="jdone-${jobId}">Posted successfully ✓</div>
+    ${platforms.includes('airtable') ? `<div class="airtable-notice" id="jat-${jobId}">Airtable uploading images in background…</div>` : ''}
+  `;
+  section.prepend(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const es = new EventSource(`/stream/${jobId}`);
+  es.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'pid') {
+      document.getElementById(`jpid-${jobId}`).textContent = ev.pid;
+    }
+    if (ev.type === 'log') {
+      const box  = document.getElementById(`jlog-${jobId}`);
+      const line = document.createElement('div');
+      line.textContent = ev.msg;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+    if (ev.type === 'result') {
+      appendJobResult(jobId, ev);
+      if (ev.platform === 'airtable') {
+        const notice = document.getElementById(`jat-${jobId}`);
+        if (notice) notice.remove();
+      }
+    }
+    if (ev.progress != null) {
+      document.getElementById(`jpbar-${jobId}`).style.width = ev.progress + '%';
+    }
+    if (ev.type === 'done' || ev.type === 'partial_done') {
+      const b = document.getElementById(`jdone-${jobId}`);
+      if (b) b.classList.add('show');
+      if (ev.type === 'done') es.close();
+    }
+    if (ev.type === 'error') {
+      const box  = document.getElementById(`jlog-${jobId}`);
+      const line = document.createElement('div');
+      line.style.color = 'var(--red)';
+      line.textContent = '✗ ' + ev.msg;
+      box.appendChild(line);
+      es.close();
+    }
+  };
+  es.onerror = () => es.close();
+}
+
+function appendJobResult(jobId, ev) {
+  const list = document.getElementById(`jresults-${jobId}`);
+  const row  = document.createElement('div');
+  row.className = `rrow ${ev.success ? 'ok' : 'err'}`;
+  row.innerHTML = `
+    <div class="r-left">
+      <span class="r-plat">${escHtml(ev.label)}</span>
+      ${ev.url ? `<a class="r-link" href="${escHtml(ev.url)}" target="_blank">View listing ↗</a>` : ''}
+      ${!ev.success && ev.error ? `<span class="r-err">${escHtml(ev.error)}</span>` : ''}
+    </div>
+    <div>
+      <span class="badge ${ev.success ? 'ok' : 'err'}">${ev.success ? (ev.images ? ev.images + ' imgs' : '✓') : 'Failed'}</span>
+    </div>
+  `;
+  list.appendChild(row);
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
