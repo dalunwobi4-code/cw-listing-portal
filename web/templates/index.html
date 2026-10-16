@@ -185,6 +185,35 @@ textarea::placeholder { color: var(--muted); }
 /* spinner */
 .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* tabs */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+.tab-btn {
+  padding: 9px 20px; background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer;
+  margin-bottom: -1px; transition: color .15s, border-color .15s;
+}
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--text); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* land form */
+.lf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.lf-row.full { grid-template-columns: 1fr; }
+.lf { display: flex; flex-direction: column; gap: 4px; }
+.lf label { font-size: 11px; color: var(--muted); }
+.price-mode { display: flex; gap: 16px; padding-top: 9px; }
+.price-mode label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.price-mode input[type=radio] { accent-color: var(--accent); }
+.post-btn.land { background: var(--green); color: #000; }
+input.field, select.field {
+  width: 100%; padding: 10px 12px; background: #111; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .15s;
+}
+input.field:focus, select.field:focus { border-color: var(--accent); }
+select.field option { background: #111; }
 </style>
 </head>
 <body>
@@ -192,12 +221,25 @@ textarea::placeholder { color: var(--muted); }
 
   <header>
     <div class="logo">CW</div>
-    <div>
+    <div style="flex:1">
       <h1>Property Listing Portal</h1>
       <p>Paste the WhatsApp description → upload images → post everywhere</p>
     </div>
+    <div id="user-pill" style="display:none;align-items:center;gap:10px;flex-shrink:0">
+      <span id="user-name-badge" style="font-size:13px;font-weight:700;color:var(--accent)"></span>
+      <a href="/dashboard" style="font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 11px;border-radius:20px;white-space:nowrap">Dashboard</a>
+      <button onclick="doLogout()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0">Logout</button>
+    </div>
   </header>
 
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-property" onclick="switchTab('property')">Property</button>
+    <button class="tab-btn" id="tab-land" onclick="switchTab('land')">Land</button>
+  </div>
+
+  <!-- Property panel (existing) -->
+  <div id="panel-property" class="tab-panel active">
   <div class="cols">
 
     <!-- LEFT: description + images -->
@@ -298,6 +340,158 @@ Available tags: APARTMENT · FLAT · STUDIO · PENTHOUSE · DUPLEX · DETACHED �
 
     </div>
   </div>
+  </div><!-- /panel-property -->
+
+  <!-- Land panel -->
+  <div id="panel-land" class="tab-panel">
+    <div class="cols">
+
+      <!-- LEFT: land form fields -->
+      <div>
+        <div class="card">
+          <div class="card-title">Land Details</div>
+
+          <div class="lf-row">
+            <div class="lf">
+              <label>Title</label>
+              <input id="land-title" class="field" type="text" placeholder="e.g. 9,000sqm Mixed-Use Land in Lekki Phase 1">
+            </div>
+          </div>
+
+          <div class="lf-row">
+            <div class="lf">
+              <label>Land Type</label>
+              <select id="land-subtype" class="field">
+                <option value="Mixed-Use Land">Mixed-Use Land</option>
+                <option value="Residential Land">Residential Land</option>
+                <option value="Commercial Land">Commercial Land</option>
+                <option value="Industrial Land">Industrial Land</option>
+                <option value="Land">Land</option>
+                <option value="Joint Venture">Joint Venture</option>
+              </select>
+            </div>
+            <div class="lf">
+              <label>Size (sqm)</label>
+              <input id="land-size" class="field" type="text" placeholder="e.g. 9000">
+            </div>
+          </div>
+
+          <div class="lf-row">
+            <div class="lf">
+              <label>Price (₦)</label>
+              <input id="land-price" class="field" type="text" placeholder="e.g. ₦1,500,000,000">
+            </div>
+            <div class="lf">
+              <label>Price Mode</label>
+              <div class="price-mode">
+                <label><input type="radio" name="land-price-mode" value="total" checked> Total</label>
+                <label><input type="radio" name="land-price-mode" value="per_sqm"> Per sqm</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="lf-row">
+            <div class="lf">
+              <label>Location (neighbourhood)</label>
+              <select id="land-location" class="field">
+                <option value="Lekki Phase 1">Lekki Phase 1</option>
+                <option value="Ikoyi">Ikoyi</option>
+                <option value="Victoria Island">Victoria Island</option>
+                <option value="Lekki">Lekki</option>
+                <option value="Ajah">Ajah</option>
+                <option value="Ibeju-Lekki">Ibeju-Lekki</option>
+                <option value="Banana Island">Banana Island</option>
+                <option value="Surulere">Surulere</option>
+                <option value="Yaba">Yaba</option>
+                <option value="Maryland">Maryland</option>
+                <option value="Ikeja GRA">Ikeja GRA</option>
+                <option value="Other">Other (enter in title)</option>
+              </select>
+            </div>
+            <div class="lf">
+              <label>Title Document</label>
+              <select id="land-title-doc" class="field">
+                <option value="Governor's Consent">Governor's Consent</option>
+                <option value="C of O">Certificate of Occupancy (C of O)</option>
+                <option value="Registered Survey">Registered Survey</option>
+                <option value="Deed of Assignment">Deed of Assignment</option>
+                <option value="Excision">Excision</option>
+                <option value="Freehold">Freehold</option>
+                <option value="">Unknown / Not Specified</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="lf-row full">
+            <div class="lf">
+              <label>Description</label>
+              <textarea id="land-desc" style="min-height:120px" placeholder="Key selling points, access road, utilities, perimeter fencing…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent -->
+        <div class="card">
+          <div class="card-title">Agent</div>
+          <select class="agent-select" id="land-agent-select">
+            <option value="">— Select agent —</option>
+          </select>
+        </div>
+
+        <!-- Images -->
+        <div class="card">
+          <div class="card-title">Land Images (optional — card auto-generated if none)</div>
+          <div class="dz" id="land-drop-zone"
+               ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="landDzDrop(event)">
+            <input type="file" id="land-file-input" multiple accept="image/*,.heic,.heif" onchange="landFilesChosen(event)">
+            <div class="dz-icon">🌍</div>
+            <div class="dz-text"><strong>Click to choose</strong> or drag &amp; drop images</div>
+          </div>
+          <div class="thumb-row" id="land-thumb-row"></div>
+          <div class="img-count" id="land-img-count"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: platforms + post -->
+      <div>
+        <div class="card">
+          <div class="card-title">Post to</div>
+          <div class="plat-list" id="land-plat-list">
+            <label class="plat-row on" data-p="ppng-land">
+              <input type="checkbox" value="ppng" checked>
+              <div><div class="plat-name">PP Nigeria</div><div class="plat-url">privateproperty.ng</div></div>
+              <div class="toggle on"></div>
+            </label>
+            <label class="plat-row on" data-p="propertypro-land">
+              <input type="checkbox" value="propertypro" checked>
+              <div><div class="plat-name">PropertyPro</div><div class="plat-url">propertypro.ng</div></div>
+              <div class="toggle on"></div>
+            </label>
+            <label class="plat-row on" data-p="npc_daniel-land">
+              <input type="checkbox" value="npc_daniel" checked>
+              <div><div class="plat-name">Daniel NPC</div><div class="plat-url">nigeriapropertycentre.com</div></div>
+              <div class="toggle on"></div>
+            </label>
+            <label class="plat-row on" data-p="npc_cw-land">
+              <input type="checkbox" value="npc_cw" checked>
+              <div><div class="plat-name">CW NPC</div><div class="plat-url">nigeriapropertycentre.com</div></div>
+              <div class="toggle on"></div>
+            </label>
+            <label class="plat-row on" data-p="airtable-land">
+              <input type="checkbox" value="airtable" checked>
+              <div><div class="plat-name">Airtable</div><div class="plat-url">CW Lagos base</div></div>
+              <div class="toggle on"></div>
+            </label>
+          </div>
+
+          <button class="post-btn land" id="land-post-btn" onclick="submitLandJob()">
+            Post Land Listing
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /panel-land -->
 
   <!-- Jobs strip — one card per submitted listing -->
   <div id="jobs-section"></div>
@@ -305,6 +499,19 @@ Available tags: APARTMENT · FLAT · STUDIO · PENTHOUSE · DUPLEX · DETACHED �
 </div>
 
 <script>
+// ── auth ──────────────────────────────────────────────────────────────────
+(function() {
+  const s = JSON.parse(localStorage.getItem('cw_session') || 'null');
+  if (!s || !s.user) { window.location.replace('/login'); return; }
+  window._cwUser = s.user;
+  document.addEventListener('DOMContentLoaded', () => {
+    const pill = document.getElementById('user-pill');
+    const badge = document.getElementById('user-name-badge');
+    if (pill && badge) { badge.textContent = s.user; pill.style.display = 'flex'; }
+  });
+})();
+function doLogout() { localStorage.removeItem('cw_session'); window.location.href = '/login'; }
+
 // ── state ────────────────────────────────────────────────────────────────
 let parsedProp    = null;
 let uploadedFiles = [];
@@ -337,6 +544,141 @@ document.querySelectorAll('.plat-row').forEach(row => {
     row.querySelector('.toggle').classList.toggle('on', cb.checked);
   });
 });
+
+// ── tab switching ────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ── land agent select (populated alongside property agent select) ─────────
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res    = await fetch('/agents');
+    const agents = await res.json();
+    const sel    = document.getElementById('land-agent-select');
+    sel.innerHTML = '<option value="">— Select agent —</option>';
+    agents.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.name;
+      sel.appendChild(opt);
+    });
+  } catch(e) {}
+});
+
+// ── land file handling ────────────────────────────────────────────────────
+let landUploadedFiles = [];
+function landFilesChosen(e) { addLandFiles([...e.target.files]); e.target.value = ''; }
+function landDzDrop(e) { e.preventDefault(); document.getElementById('land-drop-zone').classList.remove('over'); addLandFiles([...e.dataTransfer.files]); }
+function addLandFiles(files) {
+  landUploadedFiles.push(...files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name)));
+  renderLandThumbs();
+}
+function renderLandThumbs() {
+  const row   = document.getElementById('land-thumb-row');
+  const count = document.getElementById('land-img-count');
+  row.innerHTML = '';
+  landUploadedFiles.slice(0, 10).forEach(f => {
+    const img = document.createElement('img'); img.className = 'thumb';
+    img.src = URL.createObjectURL(f); row.appendChild(img);
+  });
+  if (landUploadedFiles.length > 10) {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;align-items:center;color:var(--muted);font-size:12px;padding:0 4px';
+    d.textContent = `+${landUploadedFiles.length - 10} more`;
+    row.appendChild(d);
+  }
+  count.textContent = landUploadedFiles.length
+    ? `${landUploadedFiles.length} image${landUploadedFiles.length > 1 ? 's' : ''} selected`
+    : '';
+}
+
+// ── submit land ──────────────────────────────────────────────────────────
+async function submitLandJob() {
+  const title    = document.getElementById('land-title').value.trim();
+  const subtype  = document.getElementById('land-subtype').value;
+  const size     = document.getElementById('land-size').value.trim();
+  const price    = document.getElementById('land-price').value.trim();
+  const location = document.getElementById('land-location').value;
+  const titleDoc = document.getElementById('land-title-doc').value;
+  const desc     = document.getElementById('land-desc').value.trim();
+  const priceMode = document.querySelector('input[name="land-price-mode"]:checked').value;
+
+  if (!title)    { alert('Enter a listing title.'); return; }
+  if (!price)    { alert('Enter a price.'); return; }
+  if (!location) { alert('Select a location.'); return; }
+
+  const agentSel  = document.getElementById('land-agent-select');
+  const agentId   = agentSel.value;
+  const agentName = agentId ? agentSel.options[agentSel.selectedIndex].text : '';
+  if (!agentId)  { alert('Select an agent.'); return; }
+
+  const platforms = [...document.querySelectorAll('#land-plat-list input:checked')].map(c => c.value);
+  if (!platforms.length) { alert('Select at least one platform.'); return; }
+
+  const postBtn = document.getElementById('land-post-btn');
+  postBtn.disabled = true;
+  postBtn.innerHTML = '<span class="spin"></span>Uploading…';
+
+  const prop = {
+    property_type: subtype,
+    title,
+    price: 0,
+    price_text: price,
+    land_size: size ? (size + ' sqm') : '',
+    price_mode: priceMode,
+    location,
+    title_document: titleDoc,
+    description: desc,
+    agent_id: agentId,
+    agent_name: agentName,
+    is_land: true,
+    mode: 'sale',
+    bedrooms: 0, bathrooms: 0, toilets: 0, features: [],
+    street: '',
+  };
+
+  const sessionId = 'land_' + Math.random().toString(36).slice(2, 10);
+
+  if (landUploadedFiles.length) {
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    landUploadedFiles.forEach(f => fd.append('images', f));
+    try {
+      const upRes = await fetch('/upload-images', { method: 'POST', body: fd });
+      if (!upRes.ok) {
+        const go = confirm(`Image upload failed (${upRes.status}). Post without images?`);
+        if (!go) { postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
+      }
+    } catch(upErr) {
+      const go = confirm(`Upload error: ${upErr.message}. Post without images?`);
+      if (!go) { postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
+    }
+  }
+
+  const res = await fetch('/start-land-job', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ property: prop, platforms, session_id: sessionId, posted_by: window._cwUser || '' }),
+  });
+  const { job_id, error } = await res.json();
+  if (error) { alert(error); postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
+
+  // Clear form
+  document.getElementById('land-title').value = '';
+  document.getElementById('land-size').value = '';
+  document.getElementById('land-price').value = '';
+  document.getElementById('land-desc').value = '';
+  landUploadedFiles = [];
+  renderLandThumbs();
+  postBtn.disabled = false;
+  postBtn.textContent = 'Post Land Listing';
+
+  spawnJobCard(job_id, title, platforms);
+}
 
 // ── parse ─────────────────────────────────────────────────────────────────
 async function parseDesc() {
@@ -379,7 +721,7 @@ function renderPreview(p) {
                    'Detached Duplex','Duplex','Bungalow','House','Mansion','Townhouse',
                    'Commercial Property','Office Space','Shop','Warehouse','Plaza',
                    'Factory','Event Centre','Land'];
-  const LOCS    = ['Lekki Phase 1','Victoria Island','Ikoyi','Lekki'];
+  const LOCS    = ['Lekki Phase 1','Victoria Island','Ikoyi','Lekki','Oniru','Banana Island','Old Ikoyi','Eko Atlantic','Chevron Drive','VGC','Osapa London','Ajah'];
 
   const modeOpts  = MODES.map(m  => `<option value="${m}" ${p.mode===m?'selected':''}>${MLABELS[m]}</option>`).join('');
   const ptypeOpts = PTYPES.map(t => `<option value="${t}" ${p.property_type===t?'selected':''}>${t}</option>`).join('');
@@ -522,7 +864,7 @@ async function submitJob() {
   const res = await fetch('/start-job', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ property: prop, platforms, session_id: sessionId }),
+    body: JSON.stringify({ property: prop, platforms, session_id: sessionId, posted_by: window._cwUser || '' }),
   });
   const { job_id, error } = await res.json();
   if (error) { alert(error); postBtn.disabled = false; postBtn.textContent = 'Post Listing'; return; }
