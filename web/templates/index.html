@@ -346,22 +346,35 @@ Available tags: APARTMENT · FLAT · STUDIO · PENTHOUSE · DUPLEX · DETACHED �
   <div id="panel-land" class="tab-panel">
     <div class="cols">
 
-      <!-- LEFT: land form fields -->
+      <!-- LEFT: land description + parse -->
       <div>
         <div class="card">
-          <div class="card-title">Land Details</div>
+          <div class="card-title">WhatsApp Land Description</div>
+          <textarea id="land-desc-input"
+            placeholder="Paste the WhatsApp land listing message:
 
-          <div class="lf-row">
-            <div class="lf">
-              <label>Title</label>
-              <input id="land-title" class="field" type="text" placeholder="e.g. 9,000sqm Mixed-Use Land in Lekki Phase 1">
+LAND FOR SALE — BANANA ISLAND, IKOYI
+
+📍 Location: 1st avenue, Banana Island
+📐 Land Size: 1,000 sqm
+💰 Price: ₦5,000,000 per sqm
+📄 Title: Federal Certificate of Occupancy (C of O)"></textarea>
+          <button class="parse-btn" id="land-parse-btn" onclick="parseLandDesc()">
+            Parse Land Description
+          </button>
+        </div>
+
+        <!-- Parsed land preview (hidden until parsed) -->
+        <div class="card" id="land-parsed-preview" style="display:none">
+          <div class="card-title">Parsed Details — verify before posting</div>
+          <div class="preview-grid" style="margin-bottom:14px">
+            <div class="pf full">
+              <div class="pf-label">Title</div>
+              <input id="land-title" class="field" type="text" style="margin-top:4px">
             </div>
-          </div>
-
-          <div class="lf-row">
-            <div class="lf">
-              <label>Land Type</label>
-              <select id="land-subtype" class="field">
+            <div class="pf">
+              <div class="pf-label">Land Type</div>
+              <select id="land-subtype" class="field" style="margin-top:4px">
                 <option value="Mixed-Use Land">Mixed-Use Land</option>
                 <option value="Residential Land">Residential Land</option>
                 <option value="Commercial Land">Commercial Land</option>
@@ -370,62 +383,40 @@ Available tags: APARTMENT · FLAT · STUDIO · PENTHOUSE · DUPLEX · DETACHED �
                 <option value="Joint Venture">Joint Venture</option>
               </select>
             </div>
-            <div class="lf">
-              <label>Size (sqm)</label>
-              <input id="land-size" class="field" type="text" placeholder="e.g. 9000">
+            <div class="pf">
+              <div class="pf-label">Size (sqm)</div>
+              <input id="land-size" class="field" type="text" style="margin-top:4px">
             </div>
-          </div>
-
-          <div class="lf-row">
-            <div class="lf">
-              <label>Price (₦)</label>
-              <input id="land-price" class="field" type="text" placeholder="e.g. ₦1,500,000,000">
+            <div class="pf">
+              <div class="pf-label">Price</div>
+              <input id="land-price" class="field" type="text" style="margin-top:4px">
             </div>
-            <div class="lf">
-              <label>Price Mode</label>
-              <div class="price-mode">
+            <div class="pf">
+              <div class="pf-label">Price Mode</div>
+              <div class="price-mode" style="margin-top:4px">
                 <label><input type="radio" name="land-price-mode" value="total" checked> Total</label>
                 <label><input type="radio" name="land-price-mode" value="per_sqm"> Per sqm</label>
               </div>
             </div>
-          </div>
-
-          <div class="lf-row">
-            <div class="lf">
-              <label>Location (neighbourhood)</label>
-              <select id="land-location" class="field">
-                <option value="Lekki Phase 1">Lekki Phase 1</option>
-                <option value="Ikoyi">Ikoyi</option>
-                <option value="Victoria Island">Victoria Island</option>
-                <option value="Lekki">Lekki</option>
-                <option value="Ajah">Ajah</option>
-                <option value="Ibeju-Lekki">Ibeju-Lekki</option>
-                <option value="Banana Island">Banana Island</option>
-                <option value="Surulere">Surulere</option>
-                <option value="Yaba">Yaba</option>
-                <option value="Maryland">Maryland</option>
-                <option value="Ikeja GRA">Ikeja GRA</option>
-                <option value="Other">Other (enter in title)</option>
-              </select>
+            <div class="pf">
+              <div class="pf-label">Location</div>
+              <input id="land-location" class="field" type="text" style="margin-top:4px">
             </div>
-            <div class="lf">
-              <label>Title Document</label>
-              <select id="land-title-doc" class="field">
+            <div class="pf">
+              <div class="pf-label">Title Document</div>
+              <select id="land-title-doc" class="field" style="margin-top:4px">
+                <option value="">Unknown / Not Specified</option>
                 <option value="Governor's Consent">Governor's Consent</option>
                 <option value="C of O">Certificate of Occupancy (C of O)</option>
                 <option value="Registered Survey">Registered Survey</option>
                 <option value="Deed of Assignment">Deed of Assignment</option>
                 <option value="Excision">Excision</option>
                 <option value="Freehold">Freehold</option>
-                <option value="">Unknown / Not Specified</option>
               </select>
             </div>
-          </div>
-
-          <div class="lf-row full">
-            <div class="lf">
-              <label>Description</label>
-              <textarea id="land-desc" style="min-height:120px" placeholder="Key selling points, access road, utilities, perimeter fencing…"></textarea>
+            <div class="pf full">
+              <div class="pf-label">Description</div>
+              <textarea id="land-desc" style="min-height:100px;margin-top:4px" placeholder="Key selling points…"></textarea>
             </div>
           </div>
         </div>
@@ -484,7 +475,7 @@ Available tags: APARTMENT · FLAT · STUDIO · PENTHOUSE · DUPLEX · DETACHED �
             </label>
           </div>
 
-          <button class="post-btn land" id="land-post-btn" onclick="submitLandJob()">
+          <button class="post-btn land" id="land-post-btn" onclick="submitLandJob()" disabled>
             Post Land Listing
           </button>
         </div>
@@ -569,6 +560,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch(e) {}
 });
 
+// ── land parse ───────────────────────────────────────────────────────────
+let parsedLandProp = null;
+async function parseLandDesc() {
+  const text = document.getElementById('land-desc-input').value.trim();
+  if (!text) { alert('Paste a land description first.'); return; }
+
+  const btn = document.getElementById('land-parse-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Parsing…';
+
+  try {
+    const res  = await fetch('/parse-land', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    parsedLandProp = data;
+
+    // Populate editable fields
+    document.getElementById('land-title').value    = data.title || '';
+    const subtypeSel = document.getElementById('land-subtype');
+    [...subtypeSel.options].forEach(o => { o.selected = o.value === data.property_type; });
+    document.getElementById('land-size').value     = data.land_size || '';
+    document.getElementById('land-price').value    = data.price_text || '';
+    document.getElementById('land-location').value = data.location || '';
+    const titleDocSel = document.getElementById('land-title-doc');
+    [...titleDocSel.options].forEach(o => { o.selected = o.value === data.title_document; });
+    document.getElementById('land-desc').value     = data.description || '';
+    const modeRadio = document.querySelector(`input[name="land-price-mode"][value="${data.price_mode || 'total'}"]`);
+    if (modeRadio) modeRadio.checked = true;
+
+    document.getElementById('land-parsed-preview').style.display = 'block';
+    document.getElementById('land-post-btn').disabled = false;
+  } catch(e) {
+    alert('Parse failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Parse Land Description';
+  }
+}
+
 // ── land file handling ────────────────────────────────────────────────────
 let landUploadedFiles = [];
 function landFilesChosen(e) { addLandFiles([...e.target.files]); e.target.value = ''; }
@@ -598,18 +632,20 @@ function renderLandThumbs() {
 
 // ── submit land ──────────────────────────────────────────────────────────
 async function submitLandJob() {
+  if (!parsedLandProp) { alert('Parse a land description first.'); return; }
+
   const title    = document.getElementById('land-title').value.trim();
   const subtype  = document.getElementById('land-subtype').value;
   const size     = document.getElementById('land-size').value.trim();
   const price    = document.getElementById('land-price').value.trim();
-  const location = document.getElementById('land-location').value;
+  const location = document.getElementById('land-location').value.trim();
   const titleDoc = document.getElementById('land-title-doc').value;
   const desc     = document.getElementById('land-desc').value.trim();
   const priceMode = document.querySelector('input[name="land-price-mode"]:checked').value;
 
   if (!title)    { alert('Enter a listing title.'); return; }
   if (!price)    { alert('Enter a price.'); return; }
-  if (!location) { alert('Select a location.'); return; }
+  if (!location) { alert('Enter a location.'); return; }
 
   const agentSel  = document.getElementById('land-agent-select');
   const agentId   = agentSel.value;
@@ -668,9 +704,13 @@ async function submitLandJob() {
   if (error) { alert(error); postBtn.disabled = false; postBtn.textContent = 'Post Land Listing'; return; }
 
   // Clear form
+  parsedLandProp = null;
+  document.getElementById('land-desc-input').value = '';
+  document.getElementById('land-parsed-preview').style.display = 'none';
   document.getElementById('land-title').value = '';
   document.getElementById('land-size').value = '';
   document.getElementById('land-price').value = '';
+  document.getElementById('land-location').value = '';
   document.getElementById('land-desc').value = '';
   landUploadedFiles = [];
   renderLandThumbs();

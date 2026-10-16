@@ -1215,6 +1215,109 @@ def parse():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/parse-land", methods=["POST"])
+def parse_land():
+    text = (request.get_json() or {}).get("text", "").strip()
+    if not text:
+        return jsonify({"error": "no text"}), 400
+    try:
+        t = text
+        t_low = t.lower()
+
+        # ── title: first non-empty line that isn't a pure emoji/icon line ─────
+        lines = [l.strip() for l in t.strip().splitlines() if l.strip()]
+        title = ""
+        for l in lines:
+            clean = re.sub(r"[^\w\s₦\-–—,./']", "", l).strip()
+            if len(clean) > 6:
+                title = l
+                break
+
+        # ── land subtype ──────────────────────────────────────────────────────
+        subtype = "Mixed-Use Land"
+        for pat, val in [
+            (r"residential\s+land",   "Residential Land"),
+            (r"commercial\s+land",    "Commercial Land"),
+            (r"industrial\s+land",    "Industrial Land"),
+            (r"joint\s+venture",      "Joint Venture"),
+            (r"\bplot\b",             "Land"),
+        ]:
+            if re.search(pat, t_low):
+                subtype = val
+                break
+        if re.search(r"mixed.use", t_low):
+            subtype = "Mixed-Use Land"
+
+        # ── size ──────────────────────────────────────────────────────────────
+        size = ""
+        m = re.search(r"([\d,]+(?:\.\d+)?)\s*(?:sqm|sq\.?\s?m|m2|m²|square\s*met(?:er|re)s?)", t_low)
+        if m:
+            size = m.group(1).replace(",", "")
+
+        # ── price ─────────────────────────────────────────────────────────────
+        price_text = ""
+        price_mode = "total"
+        pm = re.search(
+            r"(?:price|value|cost)[:\s]*([₦N]?\s*[\d,]+(?:\.\d+)?(?:\s*(?:million|billion|m|b|k))?(?:\s*per\s+(?:sqm|sq\.?\s?m|plot|m2))?[^\n]*)",
+            t, re.IGNORECASE)
+        if pm:
+            price_text = pm.group(1).strip()
+        else:
+            # fallback: first ₦ line
+            pm2 = re.search(r"₦\s*[\d,]+[^\n]*", t)
+            if pm2:
+                price_text = pm2.group(0).strip()
+        if re.search(r"per\s+(?:sqm|sq\.?\s?m|m2)", price_text, re.IGNORECASE):
+            price_mode = "per_sqm"
+
+        # ── location ─────────────────────────────────────────────────────────
+        location = ""
+        _HOODS = [
+            "banana island","ikoyi","victoria island","vi","lekki phase 1","lekki phase1",
+            "lekki","ajah","ibeju lekki","ibeju-lekki","chevron","osapa","jakande",
+            "surulere","yaba","maryland","ikeja gra","gbagada","magodo","omole",
+        ]
+        for hood in _HOODS:
+            if hood in t_low:
+                location = hood.title().replace("Vi", "Victoria Island").replace("Ibeju Lekki","Ibeju-Lekki").replace("Lekki Phase1","Lekki Phase 1")
+                break
+        if not location:
+            lm = re.search(r"(?:location|address)[:\s]+([^\n]+)", t, re.IGNORECASE)
+            if lm:
+                location = lm.group(1).strip().split(",")[0].strip()
+
+        # ── title document ────────────────────────────────────────────────────
+        title_doc = ""
+        for pat, val in [
+            (r"governor'?s?\s+consent",      "Governor's Consent"),
+            (r"c\s*of\s*o|certificate\s+of\s+occupancy", "C of O"),
+            (r"deed\s+of\s+assign",          "Deed of Assignment"),
+            (r"registered\s+survey",         "Registered Survey"),
+            (r"excision",                    "Excision"),
+            (r"freehold",                    "Freehold"),
+        ]:
+            if re.search(pat, t_low):
+                title_doc = val
+                break
+
+        # ── description: everything after the first line ──────────────────────
+        desc = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
+
+        return jsonify({
+            "title":          title,
+            "property_type":  subtype,
+            "land_size":      size,
+            "price_text":     price_text,
+            "price_mode":     price_mode,
+            "location":       location,
+            "title_document": title_doc,
+            "description":    desc,
+            "is_land":        True,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/upload-images", methods=["POST"])
 def upload_images():
     session_id = request.form.get("session_id", "default")
