@@ -400,7 +400,13 @@ LAND FOR SALE — BANANA ISLAND, IKOYI
             </div>
             <div class="pf">
               <div class="pf-label">Location</div>
-              <input id="land-location" class="field" type="text" style="margin-top:4px">
+              <select id="land-location" class="field" style="margin-top:4px">
+                <option value="">— Select location —</option>
+                <option value="Lekki Phase 1">Lekki Phase 1</option>
+                <option value="Lekki">Lekki</option>
+                <option value="Victoria Island">Victoria Island</option>
+                <option value="Ikoyi">Ikoyi</option>
+              </select>
             </div>
             <div class="pf">
               <div class="pf-label">Title Document</div>
@@ -586,7 +592,14 @@ async function parseLandDesc() {
     [...subtypeSel.options].forEach(o => { o.selected = o.value === data.property_type; });
     document.getElementById('land-size').value     = data.land_size || '';
     document.getElementById('land-price').value    = data.price_text || '';
-    document.getElementById('land-location').value = data.location || '';
+    // Snap parsed location to one of the 4 valid options
+    const locRaw = (data.location || '').toLowerCase();
+    let locVal = '';
+    if (/lekki\s*phase\s*1|lekki\s*phase\s*one/.test(locRaw))  locVal = 'Lekki Phase 1';
+    else if (/lekki/.test(locRaw))                               locVal = 'Lekki';
+    else if (/victoria\s*island|banana\s*island|\bvi\b/.test(locRaw)) locVal = 'Victoria Island';
+    else if (/ikoyi/.test(locRaw))                               locVal = 'Ikoyi';
+    document.getElementById('land-location').value = locVal;
     const titleDocSel = document.getElementById('land-title-doc');
     [...titleDocSel.options].forEach(o => { o.selected = o.value === data.title_document; });
     document.getElementById('land-desc').value     = data.description || '';
@@ -645,7 +658,7 @@ async function submitLandJob() {
 
   if (!title)    { alert('Enter a listing title.'); return; }
   if (!price)    { alert('Enter a price.'); return; }
-  if (!location) { alert('Enter a location.'); return; }
+  if (!location) { alert('Select a location.'); return; }
 
   const agentSel  = document.getElementById('land-agent-select');
   const agentId   = agentSel.value;
