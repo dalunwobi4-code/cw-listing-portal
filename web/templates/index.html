@@ -672,11 +672,21 @@ async function submitLandJob() {
   postBtn.disabled = true;
   postBtn.innerHTML = '<span class="spin"></span>Uploading…';
 
+  // Parse size → numeric sqm
+  const sizeNum = size ? parseInt(size.replace(/[^0-9]/g, ''), 10) : 0;
+  // Format price for Cloudinary card and Airtable
+  const priceNum = price ? parseInt(price.replace(/[^0-9]/g, ''), 10) : 0;
+  const priceStr = priceNum
+    ? ('₦' + priceNum.toLocaleString('en-NG') + (priceMode === 'per_sqm' ? '/sqm' : ''))
+    : price;
+
   const prop = {
     property_type: subtype,
     title,
-    price: 0,
+    price:      priceNum,
+    price_str:  priceStr,
     price_text: price,
+    size_sqm:   sizeNum,
     land_size: size ? (size + ' sqm') : '',
     price_mode: priceMode,
     location,

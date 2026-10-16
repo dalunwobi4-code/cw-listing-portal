@@ -162,7 +162,8 @@ def _price_range(price: int) -> str:
 def create_record(token: str, prop: dict) -> str:
     """Create a new Airtable record for this property. Returns record_id."""
     price     = prop.get("price", 0)
-    price_str = f"₦{price:,}" if price else ""
+    # For land listings the frontend pre-formats price_str (e.g. "₦5,000,000/sqm")
+    price_str = prop.get("price_str") or (f"₦{price:,}" if price else "")
     mode      = prop.get("mode", "sale")
     location  = prop.get("location", "")
     bedrooms  = prop.get("bedrooms", 0)
