@@ -1054,9 +1054,11 @@ def run_land_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
         thumb_url = build_land_card_url(cld_fields)
         og_url    = build_land_og_card_url(cld_fields)
         card_hash = land_card_hash(thumb_url)
+        og_hash   = land_card_hash(og_url)
         prop["land_card_url"]  = thumb_url
         prop["land_og_url"]    = og_url
         prop["land_card_hash"] = card_hash
+        prop["land_og_hash"]   = og_hash
         emit(q, "log", {"msg": "Land card URL built."})
 
         # ── Download card JPEG → used as cover photo for NPC/PP ──────────────

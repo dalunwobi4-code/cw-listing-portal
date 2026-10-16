@@ -374,12 +374,13 @@ def post_property(prop: dict, image_paths: list, credentials: dict) -> dict:
         thumb_card_url = prop.get("land_card_url", "")
         og_card_url    = prop.get("land_og_url", "")
         card_hash      = prop.get("land_card_hash", "")
+        og_hash        = prop.get("land_og_hash", card_hash)
         pid_lower      = prop.get("ref", "").lower()
         if _is_land and thumb_card_url:
             try:
                 card_patch = {}
                 thumb_name = f"land-thumb-{pid_lower}-{card_hash}.jpg"
-                og_name    = f"land-og-{pid_lower}-{card_hash}.jpg"
+                og_name    = f"land-og-{pid_lower}-{og_hash}.jpg"
                 card_patch["Thumbnail Image"] = [{"url": thumb_card_url, "filename": thumb_name}]
                 if og_card_url:
                     card_patch["Share Card Image"] = [{"url": og_card_url, "filename": og_name}]
