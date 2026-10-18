@@ -19,6 +19,7 @@ BASE_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "agents"))
 
+FAILURES_FILE = Path("/root/cw_listing_agent/failures.json")
 UPLOADS_DIR    = Path(__file__).parent / "uploads"
 # Logo: bundled in web/static for Railway; falls back to local Downloads for Mac
 WATERMARK_LOGO = str(Path(__file__).parent / "static" / "cw_logo.png")
@@ -57,6 +58,11 @@ if _PROXY_URL:
         CREDENTIALS.setdefault(_p, {})["proxy_url"] = _PROXY_URL
 
 import requests as req
+
+# PID allocation lock — prevents duplicate CW##### when two jobs start simultaneously
+_pid_lock    = threading.Lock()
+_cw_counter  = None   # None = uninitialized; set on first get_next_pid() call
+_cwl_counter = None
 try:
     import anthropic as _anthropic_sdk
     # env var always wins over orchestrate.py so key rotations take effect immediately
@@ -84,8 +90,10 @@ PLATFORM_LABELS = {
 
 TEAM_MEMBERS = ["Maryann", "Tumi", "Nancy"]
 TEAM_PIN     = "0000"
+ADMIN_USER   = "Admin"
+ADMIN_PIN    = os.environ.get("ADMIN_PIN", "2468")
 
-# ── Cloudinary land card URL builders (ported from cw-framer-sync/land-card.js) ──
+# ── Cloudinary land card URL builders ────────────────────────────────────────
 
 import hashlib
 from urllib.parse import quote as _url_quote
@@ -198,6 +206,7 @@ def build_land_og_card_url(fields: dict, base_id: str = _CLD_BASE) -> str:
 def land_card_hash(url: str) -> str:
     return hashlib.sha1(url.encode()).hexdigest()[:12]
 
+
 AIRTABLE_BASE_ID = "appui0GIVsqalToEa"
 _PID_LOCK = threading.Lock()  # prevents two simultaneous jobs getting the same PID
 AIRTABLE_TABLE   = "Lagos Properties"
@@ -257,25 +266,42 @@ def _fetch_max_pid(prefix: str) -> int:
 
 
 def get_next_pid() -> str:
-    """Return next CW##### property ID."""
-    return f"CW{_fetch_max_pid('CW') + 1:05d}"
+    """Return next CW##### property ID.
+    Always fetches Airtable max so manual posts don't cause duplicate PIDs.
+    Takes max(fetched, in-memory) so concurrent portal posts still increment correctly.
+    """
+    global _cw_counter
+    with _pid_lock:
+        fetched = _fetch_max_pid("CW")
+        if _cw_counter is None:
+            _cw_counter = fetched
+        else:
+            _cw_counter = max(_cw_counter, fetched)
+        _cw_counter += 1
+        return f"CW{_cw_counter:05d}"
 
 
 def get_next_land_pid() -> str:
-    """Return next CWL#### property ID for land listings (e.g. CWL1531)."""
-    return f"CWL{_fetch_max_pid('CWL') + 1}"
+    """Return next CWL#### property ID for land listings. Same staleness fix as get_next_pid."""
+    global _cwl_counter
+    with _pid_lock:
+        fetched = _fetch_max_pid("CWL")
+        if _cwl_counter is None:
+            _cwl_counter = fetched
+        else:
+            _cwl_counter = max(_cwl_counter, fetched)
+        _cwl_counter += 1
+        return f"CWL{_cwl_counter}"
 
 
 # ── Claude: parse WhatsApp description ──────────────────────────────────────
 
-LOCATIONS = [
-    "Lekki Phase 1", "Victoria Island", "Ikoyi", "Lekki",
-    "Oniru", "Banana Island", "Old Ikoyi", "Eko Atlantic",
-    "Chevron Drive", "VGC", "Osapa London", "Ajah",
-]
+LOCATIONS = ["Lekki Phase 1", "Victoria Island", "Ikoyi", "Lekki"]
 
 # Aliases map common spelling variants → canonical location name.
 # Order matters: more specific entries must come before substrings they contain.
+# Every alias maps to one of the 4 approved posting zones.
+# Non-approved sub-areas collapse to nearest approved zone.
 _LOC_ALIASES = {
     "lekki phase one": "Lekki Phase 1",
     "lekki phase 1":   "Lekki Phase 1",
@@ -283,21 +309,21 @@ _LOC_ALIASES = {
     "lekki ph 1":      "Lekki Phase 1",
     "lekki ph1":       "Lekki Phase 1",
     "phase 1 lekki":   "Lekki Phase 1",
-    "banana island":   "Banana Island",
-    "old ikoyi":       "Old Ikoyi",
-    "eko atlantic":    "Eko Atlantic",
-    "chevron drive":   "Chevron Drive",
-    "chevron":         "Chevron Drive",
-    "victoria garden": "VGC",
-    "vgc":             "VGC",
-    "osapa london":    "Osapa London",
-    "osapa":           "Osapa London",
-    "oniru":           "Oniru",
     "victoria island": "Victoria Island",
     "v.i.":            "Victoria Island",
     "v/i":             "Victoria Island",
-    "ajah":            "Ajah",
+    "oniru":           "Victoria Island",
+    "eko atlantic":    "Victoria Island",
+    "old ikoyi":       "Ikoyi",
+    "banana island":   "Ikoyi",
     "ikoyi":           "Ikoyi",
+    "osapa london":    "Lekki",
+    "osapa":           "Lekki",
+    "chevron drive":   "Lekki",
+    "chevron":         "Lekki",
+    "victoria garden": "Lekki",
+    "vgc":             "Lekki",
+    "ajah":            "Lekki",
     "lekki":           "Lekki",
 }
 PROPERTY_TYPES = [
@@ -319,21 +345,13 @@ _PTYPE_ALIASES = {
     "semi detached":        "Semi-detached Duplex",
     "terraced duplex":      "Terraced Duplex",
     "terrace duplex":       "Terraced Duplex",
-    "terraced house":       "Terraced Duplex",
-    "terrace house":        "Terraced Duplex",
-    "terraced":             "Terraced Duplex",
-    "terrace":              "Terraced Duplex",
     "detached duplex":      "Detached Duplex",
-    "detached house":       "Detached Duplex",
-    "detached bungalow":    "Bungalow",
-    "flat":                 "Apartment",
-    "apartment":            "Apartment",
 }
 FEATURE_KEYWORDS = {
     "All Room Ensuite":   ["all room ensuite", "all rooms ensuite", "en-suite", "ensuite"],
     "Swimming Pool":      ["swimming pool", "pool"],
     "24 Hours Security":  ["24.hour security", "24hrs security", "24 hour security",
-                           "24 hours security", "round the clock security", "security"],
+                           "round the clock security", "security"],
     "Generator":          ["generator", "gen set", "diesel generator"],
     "Boys Quarter":       ["boys quarter", "bq", "boy's quarter"],
     "Elevator":           ["elevator", "lift"],
@@ -435,7 +453,7 @@ def parse_description(text: str) -> dict:
             size_sqm = int(float(sqm_m.group(1).replace(",", "")))
 
     # ── land subtype (for Airtable) ───────────────────────────────────────
-    land_subtype = "Mixed-Use Land"
+    land_subtype = "Mixed Use Land"
     if is_land:
         if re.search(r"\bcommercial\b", t_low):
             land_subtype = "Commercial Land"
@@ -892,10 +910,129 @@ def emit(q, event_type, data):
     q.put({"type": event_type, **data})
 
 
-def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
+def _log_failure(ref, title, platform, label, error, prop=None):
+    import time as _t
+    try:
+        data = []
+        if FAILURES_FILE.exists():
+            try:
+                import json as _j; data = _j.loads(FAILURES_FILE.read_text())
+            except: pass
+        data = [x for x in data if not (x.get("ref")==ref and x.get("platform")==platform)]
+        data.insert(0, {
+            "id": uuid.uuid4().hex[:12], "ref": ref, "title": title,
+            "platform": platform, "label": label, "error": error,
+            "timestamp": _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime()),
+            "prop": prop or {},
+        })
+        import json as _j; FAILURES_FILE.write_text(_j.dumps(data[:300], indent=2))
+    except: pass
+
+def _clear_failure(ref, platform):
+    try:
+        if not FAILURES_FILE.exists(): return
+        import json as _j
+        data = _j.loads(FAILURES_FILE.read_text())
+        data = [x for x in data if not (x.get("ref")==ref and x.get("platform")==platform)]
+        FAILURES_FILE.write_text(_j.dumps(data, indent=2))
+    except: pass
+
+def _run_claude_fix(job_id, platform, error, ref):
+    import anthropic as _ant, subprocess as _sp, time as _time
+    q = JOBS[job_id]["events"]
+
+    def ev(t, m): emit(q, t, {"msg": str(m)})
+
+    ev("log", "Claude is investigating...")
+    poster_map = {
+        "propertypro": "agents/poster_propertypro.py",
+        "ppng":        "agents/poster_ppng.py",
+        "npc_daniel":  "agents/poster_npc.py",
+        "npc_cw":      "agents/poster_npc.py",
+        "airtable":    "agents/poster_airtable.py",
+    }
+    poster_code = ""
+    pf = poster_map.get(platform, "")
+    if pf:
+        try:
+            with open(f"/root/cw_listing_agent/{pf}") as f: poster_code = f.read()[:4000]
+        except: pass
+    try:
+        logs = _sp.run("journalctl -u cwlistings -n 80 --no-pager",
+                       shell=True, capture_output=True, text=True, timeout=10).stdout[-3000:]
+    except: logs = ""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key: ev("error", "ANTHROPIC_API_KEY not set"); return
+    client = _ant.Anthropic(api_key=api_key, timeout=25.0)
+    tools = [
+        {"name":"run_bash","description":"Run bash on VPS as root.","input_schema":{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}},
+        {"name":"read_file","description":"Read a file.","input_schema":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}},
+        {"name":"write_file","description":"Write a file.","input_schema":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}},
+    ]
+    NL = chr(10)
+    system = ("You are an automated fix agent for the CW Lagos listing portal running at /root/cw_listing_agent. "
+              "Diagnose and fix posting failures. Common causes: login session expired, site changed, wrong credentials. "
+              "Restart with: systemctl restart cwlistings. Be concise.")
+    messages = [{"role":"user","content":
+        "Platform failed: "+platform+NL+"Error: "+error+NL+"Ref: "+ref+NL+NL+
+        "Recent logs:"+NL+logs+NL+NL+"Poster code:"+NL+poster_code}]
+    start = _time.time()
+    for _ in range(5):
+        if _time.time() - start > 90: ev("done", "Timed out (90s). Check logs manually."); return
+        try:
+            resp = client.messages.create(model="claude-opus-4-7", max_tokens=2048,
+                                          system=system, tools=tools, messages=messages)
+        except Exception as e: ev("error", str(e)); return
+        for block in resp.content:
+            if hasattr(block,"text") and block.text.strip(): ev("log", block.text)
+        if resp.stop_reason in ("end_turn","stop_sequence"): ev("done", "Claude finished."); return
+        if resp.stop_reason != "tool_use": ev("done", "Done."); return
+        tool_results = []
+        for block in resp.content:
+            if block.type != "tool_use": continue
+            ev("log", "-> "+block.name+": "+str(block.input)[:100])
+            try:
+                if block.name == "run_bash":
+                    r = _sp.run(block.input["command"],shell=True,capture_output=True,text=True,timeout=30)
+                    out = (r.stdout+r.stderr)[:2000] or "(no output)"
+                    ev("log", out[:300])
+                    tool_results.append({"type":"tool_result","tool_use_id":block.id,"content":out})
+                elif block.name == "read_file":
+                    with open(block.input["path"]) as f: content = f.read()[:5000]
+                    tool_results.append({"type":"tool_result","tool_use_id":block.id,"content":content})
+                elif block.name == "write_file":
+                    with open(block.input["path"],"w") as f: f.write(block.input["content"])
+                    ev("log","wrote "+block.input["path"])
+                    tool_results.append({"type":"tool_result","tool_use_id":block.id,"content":"OK"})
+                else:
+                    tool_results.append({"type":"tool_result","tool_use_id":block.id,"content":"unknown"})
+            except Exception as e:
+                tool_results.append({"type":"tool_result","tool_use_id":block.id,"content":str(e),"is_error":True})
+                ev("log","error: "+str(e))
+        messages.append({"role":"assistant","content":resp.content})
+        messages.append({"role":"user","content":tool_results})
+    ev("done", "Complete.")
+
+
+def run_job(job_id, prop, platforms, raw_image_paths, posted_by="", platform_props=None):
     q = JOBS[job_id]["events"]
     airtable_selected = False
     platform_ids = {}
+
+    def _get_prop(platform):
+        if not platform_props:
+            return prop
+        key = "npc" if platform.startswith("npc") else platform
+        override = platform_props.get(key, {})
+        if not override:
+            return prop
+        merged = {**prop, **override}
+        for k in ("ref", "posted_by", "platform_ids"):
+            if k in prop:
+                merged[k] = prop[k]
+        merged["is_land"] = merged.get("property_type") == "Land"
+        return merged
+
     try:
         emit(q, "log", {"msg": f"Getting next Property ID from Airtable…"})
         with _PID_LOCK:
@@ -905,6 +1042,20 @@ def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
         prop["ref"] = pid
         emit(q, "pid", {"pid": pid})
         emit(q, "log", {"msg": f"Property ID: {pid}"})
+
+        # Index uploaded photos for duplicate detection immediately (don't wait for nightly backfill)
+        def _index_now(paths, ref):
+            try:
+                from agents.dup_detect import compute_phash_from_path, index_batch
+                rows = []
+                for p in paths:
+                    h = compute_phash_from_path(str(p))
+                    if h is not None:
+                        rows.append(("", ref, f"local:{ref}:{Path(p).name}", h))
+                index_batch(rows)
+            except Exception as e:
+                print(f"[DUP] index failed for {ref}: {e}", flush=True)
+        threading.Thread(target=_index_now, args=(list(raw_image_paths or []), pid), daemon=True).start()
 
         # ── Enhance all images to HD ─────────────────────────────────────────
         enh_dir = BASE_DIR / "enhanced" / pid
@@ -961,10 +1112,11 @@ def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
             emit(q, "log", {"msg": f"  [{PLATFORM_LABELS[platform]}] posting…"})
             imgs = enhanced if platform == "airtable" else watermarked
             if platform != "airtable":
-                p = dict(prop)
-                p["description"] = f"{pid}\n{prop.get('description', '')}"
+                _base = _get_prop(platform)
+                p = dict(_base)
+                p["description"] = f"{pid}\n{_base.get('description', '')}"
             else:
-                p = prop
+                p = _get_prop(platform)
             return platform, poster(p, imgs, creds)
 
         # Step 1 — post to PP Nigeria, PropertyPro, NPC (fast)
@@ -973,8 +1125,7 @@ def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
             for fut in concurrent.futures.as_completed(futures):
                 platform, result = fut.result()
                 done += 1
-                # Collect platform listing IDs for Airtable record
-                lid = result.get("listing_id", "")
+                lid = result.get("listing_id", "") or result.get("property_id", "")
                 if lid:
                     platform_ids[platform] = str(lid)
                 emit(q, "result", {
@@ -987,6 +1138,11 @@ def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
                     "error":    result.get("error", ""),
                     "progress": round(done / total * 100),
                 })
+                _p = _get_prop(platform)
+                if result.get("success", False):
+                    _clear_failure(_p.get("ref",""), platform)
+                else:
+                    _log_failure(_p.get("ref",""), _p.get("title",""), platform, PLATFORM_LABELS[platform], result.get("error",""), _p)
 
         # Step 2 — main platforms done
         if airtable_selected:
@@ -997,7 +1153,6 @@ def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
 
         # Step 3 — Airtable in background, sends its result then closes stream
         if airtable_selected:
-            # Attach metadata before Airtable record is created
             prop["posted_by"]    = posted_by
             prop["platform_ids"] = platform_ids
             def _airtable_bg():
@@ -1013,6 +1168,10 @@ def run_job(job_id, prop, platforms, raw_image_paths, posted_by=""):
                         "error":    result.get("error", ""),
                         "progress": 100,
                     })
+                    if result.get("success", False):
+                        _clear_failure(prop.get("ref",""), "airtable")
+                    else:
+                        _log_failure(prop.get("ref",""), prop.get("title",""), "airtable", PLATFORM_LABELS["airtable"], result.get("error",""), prop)
                     emit(q, "done", {"msg": "All done!"})
                 except Exception as e:
                     emit(q, "error", {"msg": f"Airtable: {e}"})
@@ -1333,6 +1492,69 @@ def upload_images():
     return jsonify({"saved": saved, "count": len(saved)})
 
 
+@app.route("/api/duplicate-check", methods=["POST"])
+def api_duplicate_check():
+    """Warn-only duplicate check. Two layers:
+    1. image_matches: same photo reused (phash), labelled strong (2+) / weak (1)
+    2. ai_matches: same property re-shot (fingerprint shortlist + Claude photo comparison)
+    """
+    body = request.get_json() or {}
+    session_id = body.get("session_id", "").strip()
+    prop = body.get("property") or {}
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+    img_dir = UPLOADS_DIR / session_id
+    paths = []
+    if img_dir.exists():
+        paths = sorted(str(p) for p in img_dir.iterdir()
+                       if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".heic"})
+
+    from agents.dup_detect import check_paths_for_duplicates
+    ph = check_paths_for_duplicates(paths) if paths else {"matches": [], "hashed": 0, "failed": 0}
+    image_matches = ph["matches"][:5]
+    for m in image_matches:
+        m["strength"] = "strong" if m["matched_images"] >= 2 else "weak"
+
+    ai = {"shortlisted": 0, "matches": [], "error": None}
+    if prop and paths:
+        try:
+            from agents.dup_ai import ai_check
+            strong_refs = {m["ref"] for m in image_matches if m["strength"] == "strong"}
+            ai = ai_check(_ANTHROPIC_CLIENT, paths, prop, AIRTABLE_BASE_ID, AIRTABLE_TABLE,
+                          AIRTABLE_TOKEN, exclude_refs=strong_refs)
+        except Exception as e:
+            ai = {"shortlisted": 0, "matches": [], "error": str(e)[:200]}
+
+    # Enrich image matches with title / posted-by / created
+    refs = [m["ref"] for m in image_matches if m.get("ref")]
+    if refs:
+        formula = "OR(" + ",".join(f"{{Property ID}}='{r}'" for r in refs) + ")"
+        try:
+            r = req.get(f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}",
+                        headers={"Authorization": f"Bearer {AIRTABLE_TOKEN}"},
+                        params={"maxRecords": 10, "filterByFormula": formula,
+                                "fields[0]": "Property ID", "fields[1]": "Property Title",
+                                "fields[2]": "Posted By", "fields[3]": "Created Time"},
+                        timeout=15).json()
+            by_ref = {rec["fields"].get("Property ID", ""): (rec.get("fields", {}), rec.get("createdTime", ""), rec.get("id", ""))
+                      for rec in r.get("records", [])}
+            for m in image_matches:
+                info, ct, rid = by_ref.get(m["ref"], ({}, "", ""))
+                m["title"] = info.get("Property Title", "")
+                m["posted_by"] = info.get("Posted By", "")
+                m["created"] = info.get("Created Time", "") or ct
+                m["record_id"] = m.get("record_id") or rid
+        except Exception:
+            pass
+    for m in image_matches + ai["matches"]:
+        if m.get("record_id"):
+            m["airtable_url"] = f"https://airtable.com/{AIRTABLE_BASE_ID}/tblvHtVR3gMACTY1N/{m['record_id']}"
+
+    return jsonify({"image_matches": image_matches, "ai_matches": ai["matches"],
+                    "shortlisted": ai["shortlisted"], "ai_error": ai["error"],
+                    "hashed": ph["hashed"]})
+
+
 @app.route("/login", methods=["GET"])
 def login_page():
     return render_template("login.html", team_members=TEAM_MEMBERS)
@@ -1343,12 +1565,30 @@ def verify_pin():
     body = request.get_json() or {}
     user = body.get("user", "").strip()
     pin  = body.get("pin", "").strip()
+    if user == ADMIN_USER:
+        if pin != ADMIN_PIN:
+            return jsonify({"ok": False, "error": "Wrong PIN"}), 403
+        return jsonify({"ok": True, "user": user, "is_admin": True})
     if user not in TEAM_MEMBERS:
         return jsonify({"ok": False, "error": "Unknown user"}), 403
     if pin != TEAM_PIN:
         return jsonify({"ok": False, "error": "Wrong PIN"}), 403
     return jsonify({"ok": True, "user": user})
 
+
+@app.route("/api/failures")
+def api_failures():
+    try:
+        import json as _j
+        data = _j.loads(FAILURES_FILE.read_text()) if FAILURES_FILE.exists() else []
+    except: data = []
+    return jsonify(data)
+
+@app.route("/api/clear-failure", methods=["POST"])
+def api_clear_failure():
+    body = request.get_json() or {}
+    _clear_failure(body.get("ref",""), body.get("platform",""))
+    return jsonify({"ok": True})
 
 @app.route("/dashboard")
 def dashboard():
@@ -1357,27 +1597,17 @@ def dashboard():
 
 @app.route("/api/listings")
 def api_listings():
-    """Return listings from Airtable, optionally filtered by Posted By."""
     user  = request.args.get("user", "").strip()
     limit = min(int(request.args.get("limit", 50)), 200)
-
     url     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
     headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
-    fields  = [
-        "Property ID", "Property Title", "New Price", "Posted By",
-        "NPC CW ID", "NPC Daniel ID", "PP Nigeria ID", "PropertyPro ID",
-        "Property Link",
-    ]
-    params  = {
-        "maxRecords": limit,
-        "sort[0][field]": "Created Time",
-        "sort[0][direction]": "desc",
-    }
+    fields  = ["Property ID", "Property Title", "New Price", "Posted By",
+               "NPC CW ID", "NPC Daniel ID", "PP Nigeria ID", "PropertyPro ID", "Property Link"]
+    params  = {"maxRecords": limit, "sort[0][field]": "Created Time", "sort[0][direction]": "desc"}
     for i, f in enumerate(fields):
         params[f"fields[{i}]"] = f
     if user and user != "all":
-        params["filterByFormula"] = f"{{Posted By}}='{user}'"
-
+        params["filterByFormula"] = f"{{Posted By}}=\'{user}\'"
     try:
         r    = req.get(url, headers=headers, params=params, timeout=15)
         data = r.json()
@@ -1385,17 +1615,12 @@ def api_listings():
         for rec in data.get("records", []):
             f = rec.get("fields", {})
             records.append({
-                "id":           rec["id"],
-                "created":      rec.get("createdTime", ""),
-                "ref":          f.get("Property ID", ""),
-                "title":        f.get("Property Title", ""),
-                "price":        f.get("New Price", ""),
-                "posted_by":    f.get("Posted By", ""),
-                "npc_cw_id":    f.get("NPC CW ID", ""),
-                "npc_daniel_id":f.get("NPC Daniel ID", ""),
-                "ppng_id":      f.get("PP Nigeria ID", ""),
-                "propertypro_id":f.get("PropertyPro ID", ""),
-                "cwlagos_url":  f.get("Property Link", ""),
+                "id": rec["id"], "created": rec.get("createdTime", ""),
+                "ref": f.get("Property ID", ""), "title": f.get("Property Title", ""),
+                "price": f.get("New Price", ""), "posted_by": f.get("Posted By", ""),
+                "npc_cw_id": f.get("NPC CW ID", ""), "npc_daniel_id": f.get("NPC Daniel ID", ""),
+                "ppng_id": f.get("PP Nigeria ID", ""), "propertypro_id": f.get("PropertyPro ID", ""),
+                "cwlagos_url": f.get("Property Link", ""),
             })
         return jsonify({"records": records})
     except Exception as e:
@@ -1404,21 +1629,15 @@ def api_listings():
 
 @app.route("/api/weekly-report")
 def api_weekly_report():
-    """Return this week's listing stats per team member."""
     from datetime import datetime, timedelta
-    today   = datetime.utcnow()
-    monday  = today - timedelta(days=today.weekday())
-    monday  = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+    today  = datetime.utcnow()
+    monday = today - timedelta(days=today.weekday())
+    monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
     iso_mon = monday.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
     url     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
     headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
-    params  = {
-        "filterByFormula": f"IS_AFTER(CREATED_TIME(), '{iso_mon}')",
-        "fields[0]": "Property ID",
-        "fields[1]": "Posted By",
-        "maxRecords": 500,
-    }
+    params  = {"filterByFormula": f"IS_AFTER(CREATED_TIME(), \'{iso_mon}\')",
+               "fields[0]": "Property ID", "fields[1]": "Posted By", "maxRecords": 500}
     try:
         r    = req.get(url, headers=headers, params=params, timeout=15)
         data = r.json()
@@ -1429,13 +1648,881 @@ def api_weekly_report():
             total += 1
             if poster in counts:
                 counts[poster] += 1
-        return jsonify({
-            "week_start": monday.strftime("%b %d"),
-            "total":      total,
-            "by_member":  counts,
-        })
+        return jsonify({"week_start": monday.strftime("%b %d"), "total": total, "by_member": counts})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _require_admin():
+    pin = request.headers.get("X-Admin-Pin", "")
+    if pin != ADMIN_PIN:
+        return jsonify({"error": "Admin authorization required"}), 403
+    return None
+
+
+# ---- Comments (admin feedback on listings, with @tagging) ----
+COMMENTS_FILE = "/root/cw_listing_agent/comments.json"
+_comments_lock = threading.Lock()
+
+def _load_comments():
+    try:
+        with open(COMMENTS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def _save_comments(items):
+    with open(COMMENTS_FILE, "w") as f:
+        json.dump(items[-500:], f)
+
+@app.route("/api/comments")
+def api_comments():
+    pid    = request.args.get("pid", "").strip()
+    tagged = request.args.get("tagged", "").strip()
+    unres  = request.args.get("unresolved", "") == "1"
+    with _comments_lock:
+        items = _load_comments()
+    if pid:
+        items = [c for c in items if c.get("pid", "").upper() == pid.upper()]
+    if tagged:
+        items = [c for c in items if c.get("tag", "") == tagged]
+    if unres:
+        items = [c for c in items if not c.get("resolved")]
+    return jsonify({"comments": list(reversed(items))[:100]})
+
+@app.route("/api/comments", methods=["POST"])
+def api_comments_post():
+    body   = request.get_json() or {}
+    pid    = str(body.get("pid", "")).strip()
+    text   = str(body.get("text", "")).strip()
+    author = str(body.get("author", "")).strip()
+    tag    = str(body.get("tag", "")).strip()
+    title  = str(body.get("title", "")).strip()
+    if not pid or not text or not author:
+        return jsonify({"error": "pid, text and author required"}), 400
+    item = {"id": uuid.uuid4().hex[:10], "pid": pid, "title": title, "text": text[:1000],
+            "author": author, "tag": tag, "ts": time.time(), "resolved": False}
+    with _comments_lock:
+        items = _load_comments()
+        items.append(item)
+        _save_comments(items)
+    return jsonify({"ok": True, "comment": item})
+
+@app.route("/api/comments/resolve", methods=["POST"])
+def api_comments_resolve():
+    body = request.get_json() or {}
+    cid  = str(body.get("id", "")).strip()
+    with _comments_lock:
+        items = _load_comments()
+        for c in items:
+            if c.get("id") == cid:
+                c["resolved"] = True
+        _save_comments(items)
+    return jsonify({"ok": True})
+
+# ---- PID search (Boosting tab) ----
+@app.route("/api/pid-search")
+def api_pid_search():
+    pid = request.args.get("pid", "").strip().upper()
+    if not pid:
+        return jsonify({"error": "pid required"}), 400
+    url     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
+    headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
+    fields  = ["Property ID", "Property Title", "New Price", "Posted By",
+               "NPC CW ID", "NPC Daniel ID", "PP Nigeria ID", "PropertyPro ID", "Property Link"]
+    params  = {"maxRecords": 5, "filterByFormula": f"SEARCH('{pid}', UPPER({{Property ID}}))"}
+    for i, f in enumerate(fields):
+        params[f"fields[{i}]"] = f
+    try:
+        r = req.get(url, headers=headers, params=params, timeout=15)
+        recs = []
+        for rec in r.json().get("records", []):
+            f = rec.get("fields", {})
+            recs.append({
+                "id": rec["id"], "created": rec.get("createdTime", ""),
+                "ref": f.get("Property ID", ""), "title": f.get("Property Title", ""),
+                "price": f.get("New Price", ""), "posted_by": f.get("Posted By", ""),
+                "npc_cw_id": f.get("NPC CW ID", ""), "npc_daniel_id": f.get("NPC Daniel ID", ""),
+                "ppng_id": f.get("PP Nigeria ID", ""), "propertypro_id": f.get("PropertyPro ID", ""),
+                "cwlagos_url": f.get("Property Link", ""),
+            })
+        for rec in recs:
+            rec["npc_status"] = {}
+            for acct, field in (("npc_cw", "npc_cw_id"), ("npc_daniel", "npc_daniel_id")):
+                if rec.get(field):
+                    try:
+                        rec["npc_status"][acct] = _npc_status(acct, rec[field])
+                    except Exception:
+                        rec["npc_status"][acct] = {"boostable": False, "reason": "Couldn't check NPC right now",
+                                                   "boosted_recently": False, "last_boosted": ""}
+        return jsonify({"records": recs})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ---- Boost recommendations: rank sweep across core searches -> candidates ----
+RECO_FILE = "/root/cw_listing_agent/recommendations.json"
+_reco_lock = threading.Lock()
+_reco_running = {"flag": False}
+
+BED_OPTIONS = {"flats-apartments": (1, 2, 3, 4), "houses": (2, 3, 4, 5)}  # NPC bedroom filter is exact
+RECO_SEARCHES = [
+    {"location": loc, "mode": mode, "category": cat, "bedrooms": b}
+    for loc in ("Ikoyi", "Victoria Island", "Lekki", "Lekki Phase 1")
+    for cat in ("flats-apartments", "houses")
+    for mode in ("sale", "rent")
+    for b in BED_OPTIONS[cat]
+]
+
+def _beds_of(v):
+    if isinstance(v, list):
+        v = v[0] if v else ""
+    m = re.search(r"\d+", str(v or ""))
+    return int(m.group(0)) if m else None
+
+def _search_label(bedrooms, location, category, mode):
+    return (f"{bedrooms} bedroom " if bedrooms else "") + \
+        f"{location} \u00b7 {CATEGORY_LABEL.get(category, category.title())} \u00b7 {'Rent' if mode == 'rent' else 'Sale'}"
+
+_area_cache = {}  # location -> (ts, records)
+
+def _area_records(location):
+    """All our Airtable listings in an area that are on NPC (cached 10 min per sweep)."""
+    hit = _area_cache.get(location)
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    url     = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
+    headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
+    fields  = ["Property ID", "Property Title", "New Price", "Posted By", "NPC CW ID", "NPC Daniel ID",
+               "Name (from Listing Status)", "Property Type", "Name (from Bedroom)"]
+    params  = {"pageSize": 100,
+               "filterByFormula": f"AND({{Main Neighborhood}}='{location}', OR({{NPC CW ID}}!='', {{NPC Daniel ID}}!=''))",
+               "sort[0][field]": "Created Time", "sort[0][direction]": "desc"}
+    for i, f in enumerate(fields):
+        params[f"fields[{i}]"] = f
+    recs, off = [], None
+    for _ in range(30):
+        if off:
+            params["offset"] = off
+        d = req.get(url, headers=headers, params=params, timeout=30).json()
+        recs.extend(d.get("records", []))
+        off = d.get("offset")
+        if not off:
+            break
+    _area_cache[location] = (time.time(), recs)
+    return recs
+CATEGORY_LABEL = {"flats-apartments": "Apartments", "houses": "Houses"}
+_HOUSE_WORDS = ("duplex", "semi", "terrace", "detached", "bungalow", "house", "mansion", "townhouse", "maisonette")
+
+def _category_guess(ptype):
+    p = (ptype or "").lower()
+    if "land" in p:
+        return "land"
+    return "houses" if any(w in p for w in _HOUSE_WORDS) else "flats-apartments"
+
+def _recently_boosted_keys(days=4):
+    from agents.booster_npc import _load_boosts
+    cutoff = time.time() - days * 86400
+    return {b.get("listing_id", "") for b in _load_boosts()
+            if b.get("success") and b.get("ts", 0) > cutoff}
+
+
+_npc_checkers = {}
+_npc_checker_lock = threading.Lock()
+
+
+def _socket_janitor_loop():
+    """Every 5 min: free unreferenced sessions and drop idle pooled proxy connections.
+    Closing a session only empties its connection pool; it reconnects on next use."""
+    import gc
+    from agents.poster_npc import LIVE_SESSIONS
+    while True:
+        time.sleep(300)
+        try:
+            gc.collect()
+            for sess in list(LIVE_SESSIONS):
+                try:
+                    sess.close()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[JANITOR] {e}", flush=True)
+
+def _get_checker(acct, fresh=False):
+    from agents.booster_npc import NpcChecker
+    with _npc_checker_lock:
+        hit = _npc_checkers.get(acct)
+        if hit and not fresh and time.time() - hit[0] < 600:
+            return hit[1]
+        chk = NpcChecker(CREDENTIALS[acct])
+        if hit:
+            try:
+                hit[1].s.close()
+            except Exception:
+                pass
+        _npc_checkers[acct] = (time.time(), chk)
+        return chk
+
+def _npc_status(acct, listing_id):
+    """Live NPC status with one automatic re-login if the cached session went stale."""
+    try:
+        return _get_checker(acct).status(listing_id)
+    except Exception:
+        return _get_checker(acct, fresh=True).status(listing_id)
+
+def _reco_candidates(location, mode, ranking_refs, recent_keys, premium, limit=5, category="flats-apartments", bedrooms=None):
+    """Newest CW listings in this location+mode that NPC will accept a boost for
+    (on an account's Premium list, not boosted on NPC in 24h, not boosted by us in 4 days).
+    Returns (candidates, stats)."""
+    recs = _area_records(location)
+    want = "rent" if mode == "rent" else "sale"
+    out = []
+    stats = {"in_search": 0, "premium": 0, "boosted_recently": 0, "not_premium": [], "ranking": 0}
+    for rec in recs:
+        f = rec.get("fields", {})
+        if want not in " ".join(f.get("Name (from Listing Status)", [])).lower():
+            continue
+        ids = {"npc_cw": str(f.get("NPC CW ID", "") or ""), "npc_daniel": str(f.get("NPC Daniel ID", "") or "")}
+        npc_cat = next((premium.get(a, {}).get(l, {}).get("category") for a, l in ids.items()
+                        if l and premium.get(a, {}).get(l, {}).get("category")), "")
+        if (npc_cat or _category_guess(f.get("Property Type"))) != category:
+            continue
+        if bedrooms and _beds_of(f.get("Name (from Bedroom)")) != bedrooms:
+            continue
+        stats["in_search"] += 1
+        ref = f.get("Property ID", "")
+        if ref in ranking_refs:
+            stats["ranking"] += 1
+            continue
+        ids = {"npc_cw": str(f.get("NPC CW ID", "") or ""), "npc_daniel": str(f.get("NPC Daniel ID", "") or "")}
+        ok, on_premium, recent = {}, False, False
+        for acct, lid in ids.items():
+            st = premium.get(acct, {}).get(lid) if lid else None
+            if not st:
+                continue
+            on_premium = True
+            if st["boosted_recently"] or any(k in recent_keys for k in (f"{acct}:{lid}", lid)):
+                recent = True
+                continue
+            ok[acct] = True
+        if on_premium:
+            stats["premium"] += 1
+        if not ok:
+            if recent:
+                stats["boosted_recently"] += 1
+            elif not on_premium and len(stats["not_premium"]) < 8:
+                stats["not_premium"].append({"ref": ref, "title": f.get("Property Title", "")})
+            continue
+        if len(out) < limit:
+            out.append({
+                "ref": ref, "title": f.get("Property Title", ""),
+                "price": f.get("New Price", ""), "posted_by": f.get("Posted By", ""),
+                "npc_cw_id": ids["npc_cw"], "npc_daniel_id": ids["npc_daniel"],
+                "npc_cw_ok": bool(ok.get("npc_cw")), "npc_daniel_ok": bool(ok.get("npc_daniel")),
+                "recently_boosted": False,
+            })
+    return out, stats
+
+
+_SEARCH_AREAS = {"Lekki": ("Lekki", "Lekki Phase 1")}  # NPC's Lekki search includes Lekki Phase 1
+
+def _reco_from_npc(sc, cards, page1_ids, recent_keys, id_to_ref, limit=None):
+    """Every boostable property for one search, straight from NPC's Premium cards
+    (both accounts). One candidate per property (same CW PID or same title+price+area).
+    Sorted by photo count then newest so you can eyeball the good-looking ones first."""
+    areas = _SEARCH_AREAS.get(sc["location"], (sc["location"],))
+    props = {}
+    for c in cards:
+        if (c.get("area") not in areas or c.get("mode") != sc["mode"]
+                or c.get("category") != sc["category"] or c.get("bedrooms") != sc["bedrooms"]):
+            continue
+        ref = id_to_ref.get(c["id"], "")
+        key = ref or f"{(c.get('title') or '').lower()}|{c.get('price')}|{c.get('area')}"
+        props.setdefault(key, {"ref": ref, "cards": {}})["cards"][c["account"]] = c
+    stats = {"premium": len(props), "on_page_1": 0, "boosted_recently": 0}
+    out = []
+    for key, pr in props.items():
+        cs = pr["cards"]
+        if any(c["id"] in page1_ids for c in cs.values()):
+            stats["on_page_1"] += 1
+            continue
+        ok = {a: c for a, c in cs.items() if c.get("boostable")}
+        if not ok:
+            continue
+        any_c = max(cs.values(), key=lambda c: c.get("photo_count", 0))
+        # first account with a public URL wins (both accounts point at the same listing)
+        pub_id, pub_slug, pub_path, pub_mode, pub_cat = "", "", "", "", ""
+        for c in cs.values():
+            if c.get("url_slug") and c.get("path"):
+                pub_id = c["id"]; pub_slug = c["url_slug"]; pub_path = c["path"]
+                pub_mode = c.get("mode", ""); pub_cat = c.get("category", "")
+                break
+        public_url = ""
+        if pub_id and pub_slug:
+            tx = "for-rent" if pub_mode == "rent" else "for-sale"
+            public_url = f"https://nigeriapropertycentre.com/{tx}/{pub_cat}/lagos/{pub_path}/{pub_id}-{pub_slug}"
+        out.append({
+            "ref": pr["ref"] or any_c.get("npc_ref") or f"NPC {any_c['id']}",
+            "in_airtable": bool(pr["ref"]),
+            "title": any_c.get("title", ""), "price": any_c.get("price", ""),
+            "photo_count": any_c.get("photo_count", 0),
+            "thumb": any_c.get("thumb", ""),
+            "public_url": public_url,
+            "last_boosted": ", ".join(sorted({c.get("last_boosted") for c in cs.values() if c.get("last_boosted")})),
+            "npc_cw_id": cs["npc_cw"]["id"] if "npc_cw" in cs else "",
+            "npc_daniel_id": cs["npc_daniel"]["id"] if "npc_daniel" in cs else "",
+            "npc_cw_ok": "npc_cw" in ok, "npc_daniel_ok": "npc_daniel" in ok,
+            "recently_boosted": False, "_newest": max(int(c["id"]) for c in cs.values()),
+        })
+    out.sort(key=lambda x: (-x.get("photo_count", 0), -x["_newest"]))
+    for x in out:
+        x.pop("_newest", None)
+    return (out[:limit] if limit else out), stats
+
+def _run_reco_sweep():
+    from agents.booster_npc import check_ranking
+    from concurrent.futures import ThreadPoolExecutor
+    result = {"ts": time.time(), "status": "running", "searches": [], "phase": "Reading Premium listings from NPC"}
+    with _reco_lock:
+        with open(RECO_FILE, "w") as f:
+            json.dump(result, f)
+    def _prem(acct):
+        """Premium list for one account: 3 tries with a fresh login; if NPC still can't be
+        read, fall back to the last good list (saved after every successful read)."""
+        cache_p = f"/root/cw_listing_agent/premium_cache_{acct}.json"
+        last = None
+        for attempt in range(3):
+            try:
+                lst = _get_checker(acct, fresh=True).premium_listings()
+                if any(c.get("boostable") for c in lst):
+                    with open(cache_p, "w") as f:
+                        json.dump({"ts": time.time(), "cards": lst}, f)
+                    return acct, lst, None
+                last = "NPC returned no boostable Premium listings"
+            except Exception as e:
+                last = str(e)[:120]
+            print(f"[RECO] premium list attempt {attempt + 1} failed for {acct}: {last}", flush=True)
+            time.sleep(20)
+        try:
+            with open(cache_p) as f:
+                cached = json.load(f)
+            when = time.strftime("%d %b %H:%M", time.localtime(cached["ts"]))
+            return acct, cached["cards"], f"couldn't read NPC live ({last}), using its Premium list from {when}"
+        except Exception:
+            return acct, [], f"couldn't read NPC ({last}), no recommendations for this account"
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        got = list(ex.map(_prem, ["npc_cw", "npc_daniel"]))
+    prem_lists = {a: lst for a, lst, _ in got}
+    result["premium_notes"] = {a: n for a, _, n in got if n}
+    cards = [dict(c, account=a) for a, lst in prem_lists.items() for c in lst]
+    # Photo scoring removed 2026-09-16 — pick from the full pool per search and use
+    # the arrow gallery on the dashboard to eyeball photos yourself.
+    from agents.booster_npc import _fetch_our_npc_ids, save_extra_our_ids
+    id_to_ref = _fetch_our_npc_ids()
+    save_extra_our_ids({c["id"]: id_to_ref.get(c["id"]) or c.get("npc_ref") or f"NPC {c['id']}" for c in cards})
+    result["premium_counts"] = {a: sum(1 for c in lst if c.get("boostable")) for a, lst in prem_lists.items()}
+    result["total_searches"] = len(RECO_SEARCHES)
+    _area_cache.clear()
+    result["phase"] = "Checking searches"
+    with _reco_lock:
+        with open(RECO_FILE, "w") as f:
+            json.dump(result, f)
+    recent_keys = _recently_boosted_keys()
+    for sc in RECO_SEARCHES:
+        entry = {"location": sc["location"], "mode": sc["mode"], "category": sc["category"],
+                 "bedrooms": sc["bedrooms"],
+                 "category_label": CATEGORY_LABEL.get(sc["category"], sc["category"]),
+                 "label": _search_label(sc["bedrooms"], sc["location"], sc["category"], sc["mode"])}
+        try:
+            rank = check_ranking(sc["location"], sc["mode"], sc["bedrooms"], category=sc["category"])
+            entry.update({"rank_status": rank.get("status", "?"),
+                          "cw_count": rank.get("cw_count", 0),
+                          "top5_count": rank.get("top5_count", 0),
+                          "url": rank.get("url", "")})
+            ranking_refs = {c.get("ref", "") for c in rank.get("cw_positions", []) if c.get("ref")}
+            if rank.get("status") != "DOMINATING":
+                entry["candidates"], entry["stats"] = _reco_from_npc(
+                    sc, cards, {str(x) for x in rank.get("result_ids", [])}, recent_keys, id_to_ref)
+            else:
+                entry["candidates"], entry["stats"] = [], {}
+        except Exception as e:
+            entry["error"] = str(e)[:200]
+            entry["candidates"] = []
+        result["searches"].append(entry)
+        with _reco_lock:
+            with open(RECO_FILE, "w") as f:
+                json.dump(result, f)
+    result["status"] = "done"
+    with _reco_lock:
+        with open(RECO_FILE, "w") as f:
+            json.dump(result, f)
+    _reco_running["flag"] = False
+
+@app.route("/api/admin/recommendations")
+def api_recommendations():
+    err = _require_admin()
+    if err: return err
+    try:
+        with open(RECO_FILE) as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify({"status": "never_run", "searches": []})
+
+@app.route("/api/admin/recommendations/run", methods=["POST"])
+def api_recommendations_run():
+    err = _require_admin()
+    if err: return err
+    if _reco_running["flag"]:
+        return jsonify({"ok": True, "already_running": True})
+    _reco_running["flag"] = True
+    threading.Thread(target=_run_reco_sweep, daemon=True).start()
+    return jsonify({"ok": True})
+
+# ---- Boost verification: check page 1 15 min after each boost ----
+_verify_lock = threading.Lock()
+
+def _boost_meta_key(platform, listing_id):
+    return f"{platform}:{listing_id}"
+
+def _load_verify_meta():
+    """Extra per-boost metadata stored alongside boosts.json (location/mode + verify result)."""
+    try:
+        with open("/root/cw_listing_agent/boost_verify.json") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_verify_meta(m):
+    with open("/root/cw_listing_agent/boost_verify.json", "w") as f:
+        json.dump(m, f)
+
+def _lookup_listing_context(platform, listing_id):
+    """Get location + sale/rent for a listing so we know what search to check."""
+    field_map = {"npc_cw": "NPC CW ID", "npc_daniel": "NPC Daniel ID",
+                 "ppng": "PP Nigeria ID", "propertypro": "PropertyPro ID"}
+    field = field_map.get(platform)
+    if not field:
+        return None
+    url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}"
+    headers = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
+    params = {"maxRecords": 1, "filterByFormula": f"{{{field}}}='{listing_id}'",
+              "fields[0]": "Property ID", "fields[1]": "Property Title",
+              "fields[2]": "Main Neighborhood", "fields[3]": "Name (from Listing Status)"}
+    try:
+        r = req.get(url, headers=headers, params=params, timeout=15).json()
+        rec = (r.get("records") or [None])[0]
+        if not rec:
+            return None
+        f = rec.get("fields", {})
+        loc_field = f.get("Main Neighborhood")
+        location = ""
+        if isinstance(loc_field, list) and loc_field:
+            # linked record → resolve to name via Name (from Listing Status)? no — grab Main Neighbourhood Label
+            pass
+        # simpler: use Property Title parsing OR pull Main Neighbourhood Label from same rec
+        params2 = {"maxRecords": 1, "filterByFormula": f"{{{field}}}='{listing_id}'",
+                   "fields[0]": "Main Neighbourhood Label"}
+        r2 = req.get(url, headers=headers, params=params2, timeout=15).json()
+        rec2 = (r2.get("records") or [None])[0]
+        if rec2:
+            lab = rec2.get("fields", {}).get("Main Neighbourhood Label")
+            if isinstance(lab, list) and lab:
+                location = str(lab[0])
+            elif isinstance(lab, str):
+                location = lab
+        status = " ".join(f.get("Name (from Listing Status)", [])).lower()
+        mode = "rent" if "rent" in status else "sale"
+        pt, beds = "", None
+        try:
+            ff = req.get(url, headers=headers, params={"maxRecords": 1, "filterByFormula": f"{{{field}}}='{listing_id}'",
+                         "fields[0]": "Property Type", "fields[1]": "Name (from Bedroom)"},
+                         timeout=15).json()["records"][0]["fields"]
+            pt, beds = ff.get("Property Type", ""), _beds_of(ff.get("Name (from Bedroom)"))
+        except Exception:
+            pass
+        return {"location": location, "mode": mode, "ref": f.get("Property ID", ""),
+                "title": f.get("Property Title", ""), "ptype": pt, "beds": beds}
+    except Exception:
+        return None
+
+def _verify_boost(platform, listing_id, ref, attempt=1):
+    """Is the boosted listing on page 1 of its own NPC search (area, sale/rent, type, bedrooms)?
+    Facts come from the listing's NPC card; Airtable is only a fallback."""
+    from agents.booster_npc import check_ranking
+    key = _boost_meta_key(platform, listing_id)
+    result = {"verified_at": time.time(), "attempt": attempt}
+    if platform not in ("npc_cw", "npc_daniel"):
+        result.update({"status": "unsupported", "detail": f"Verification not built for {platform}"})
+    else:
+        st = {}
+        try:
+            st = _npc_status(platform, listing_id)
+        except Exception:
+            pass
+        loc, mode, cat, beds = st.get("area"), st.get("mode"), st.get("category"), st.get("bedrooms")
+        if not (loc and mode and cat):
+            ctx = _lookup_listing_context(platform, listing_id) or {}
+            loc = loc or ctx.get("location")
+            mode = mode or ctx.get("mode")
+            cat = cat or (_category_guess(ctx.get("ptype")) if ctx else None)
+            beds = beds or ctx.get("beds")
+        if not (loc and mode and cat):
+            result.update({"status": "no_context", "detail": "Couldn't tell which search this listing belongs to"})
+        else:
+            try:
+                beds = beds if beds in BED_OPTIONS.get(cat, ()) else None
+                rank = check_ranking(loc, mode, beds, CREDENTIALS["npc_cw"], category=cat)
+                ids = [str(x) for x in rank.get("result_ids", [])]
+                base = {"location": loc, "mode": mode, "category": cat, "bedrooms": beds,
+                        "category_label": CATEGORY_LABEL.get(cat, cat), "url": rank.get("url", ""),
+                        "title": st.get("title", "")}
+                if str(listing_id) in ids:
+                    result.update(base, status="on_page_1", position=ids.index(str(listing_id)) + 1)
+                else:
+                    result.update(base, status="not_yet" if attempt == 1 else "not_on_page_1")
+            except Exception as e:
+                result.update({"status": "check_failed", "detail": str(e)[:200]})
+    with _verify_lock:
+        meta = _load_verify_meta()
+        meta.setdefault(key, []).append(result)
+        _save_verify_meta(meta)
+
+
+def _schedule_verify(platform, listing_id, ref):
+    """No-op: _verify_loop picks up every successful boost from boosts.json,
+    so pending checks survive portal restarts."""
+    return
+
+
+def _verify_loop():
+    """Every minute: 15 min after a successful NPC boost run check 1; if not on page 1,
+    run check 2 at 30 min. Driven by boosts.json + boost_verify.json, not in-memory timers."""
+    from agents.booster_npc import _load_boosts
+    time.sleep(60)
+    while True:
+        try:
+            now = time.time()
+            meta = _load_verify_meta()
+            for b in _load_boosts():
+                if not b.get("success") or now - b.get("ts", 0) > 48 * 3600:
+                    continue
+                lid = str(b.get("listing_id", ""))
+                platform, listing_id = lid.split(":", 1) if ":" in lid else ("npc_cw", lid)
+                if platform not in ("npc_cw", "npc_daniel"):
+                    continue
+                runs = [r for r in meta.get(f"{platform}:{listing_id}", []) if r.get("verified_at", 0) >= b["ts"]]
+                age = now - b["ts"]
+                if not runs and age >= 15 * 60:
+                    _verify_boost(platform, listing_id, b.get("ref", ""), 1)
+                elif runs and runs[-1].get("status") == "not_yet" and len(runs) == 1 and age >= 30 * 60:
+                    _verify_boost(platform, listing_id, b.get("ref", ""), 2)
+        except Exception as e:
+            print(f"[VERIFY] loop error: {e}", flush=True)
+        time.sleep(60)
+
+if os.environ.get("CW_BACKGROUND", "1") != "0":
+    threading.Thread(target=_verify_loop, daemon=True).start()
+    threading.Thread(target=_socket_janitor_loop, daemon=True).start()
+
+
+@app.route("/api/admin/recent-boosts")
+def api_recent_boosts():
+    err = _require_admin()
+    if err: return err
+    from agents.booster_npc import _load_boosts
+    cutoff = time.time() - 48 * 3600
+    boosts = [b for b in _load_boosts() if b.get("ts", 0) > cutoff]
+    boosts.sort(key=lambda b: b.get("ts", 0), reverse=True)
+    verify = _load_verify_meta()
+    out = []
+    stats = {"total": 0, "verified_on_page_1": 0, "not_on_page_1": 0, "pending": 0}
+    for b in boosts:
+        lid = str(b.get("listing_id", ""))
+        # listing_id in boosts.json is "platform:id" for new entries, plain id for old NPC-only
+        if ":" in lid:
+            platform, listing_id = lid.split(":", 1)
+        else:
+            platform, listing_id = "npc_cw", lid
+        vrec = (verify.get(lid) or verify.get(f"{platform}:{listing_id}") or [])
+        latest = vrec[-1] if vrec else None
+        row = {
+            "platform": platform, "listing_id": listing_id, "ref": b.get("ref", ""),
+            "user": b.get("user", ""), "ts": b.get("ts", 0),
+            "success": b.get("success", False), "detail": b.get("detail", ""),
+            "verify": latest,
+        }
+        out.append(row)
+        if b.get("success"):
+            stats["total"] += 1
+            if latest and latest.get("status") == "on_page_1":
+                stats["verified_on_page_1"] += 1
+            elif latest and latest.get("status") == "not_on_page_1":
+                stats["not_on_page_1"] += 1
+            else:
+                stats["pending"] += 1
+    _enrich_boost_rows(out)
+    return jsonify({"boosts": out, "stats": stats})
+
+
+
+_BOOST_INFO_FILE = "/root/cw_listing_agent/boost_info.json"
+
+def _load_boost_info():
+    try:
+        with open(_BOOST_INFO_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_boost_info(key, st):
+    info = _load_boost_info()
+    info[key] = {k: st.get(k) for k in ("title", "area", "mode", "category", "bedrooms", "npc_ref", "price")}
+    with open(_BOOST_INFO_FILE, "w") as f:
+        json.dump(info, f)
+
+_boost_info_cache = {}  # ref -> (ts, info)
+
+def _enrich_boost_rows(rows):
+    """Add property title and the NPC search each boosted listing belongs to.
+    Search comes from the page-1 check when there is one (NPC's own category),
+    otherwise from Airtable (area, sale/rent, property type)."""
+    from agents.booster_npc import LOC_SLUGS, BASE_URL as NPC
+    now = time.time()
+    need = sorted({r["ref"] for r in rows if r.get("ref")
+                   and (r["ref"] not in _boost_info_cache or now - _boost_info_cache[r["ref"]][0] > 600)})
+    for i in range(0, len(need), 30):
+        chunk = need[i:i + 30]
+        formula = "OR(" + ",".join(f"{{Property ID}}='{x}'" for x in chunk) + ")"
+        params = {"pageSize": 100, "filterByFormula": formula}
+        for j, f in enumerate(["Property ID", "Property Title", "Main Neighbourhood Label",
+                               "Name (from Listing Status)", "Property Type", "Name (from Bedroom)"]):
+            params[f"fields[{j}]"] = f
+        try:
+            d = req.get(f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE}",
+                        headers={"Authorization": f"Bearer {AIRTABLE_TOKEN}"}, params=params, timeout=20).json()
+            for rec in d.get("records", []):
+                f = rec.get("fields", {})
+                lab = f.get("Main Neighbourhood Label") or [""]
+                status = " ".join(f.get("Name (from Listing Status)", [])).lower()
+                _boost_info_cache[f.get("Property ID", "")] = (now, {
+                    "title": f.get("Property Title", ""),
+                    "location": lab[0] if isinstance(lab, list) else lab,
+                    "mode": "rent" if "rent" in status else "sale",
+                    "category": _category_guess(f.get("Property Type")),
+                    "beds": _beds_of(f.get("Name (from Bedroom)")),
+                })
+        except Exception as e:
+            print(f"[RECENT] airtable enrich failed: {e}", flush=True)
+    saved = _load_boost_info()
+    for r in rows:
+        info = _boost_info_cache.get(r.get("ref"), (0, {}))[1]
+        if not info:
+            bi = saved.get(f"{r.get('platform')}:{r.get('listing_id')}", {})
+            info = {"title": bi.get("title", ""), "location": bi.get("area", ""), "mode": bi.get("mode", ""),
+                    "category": bi.get("category", ""), "beds": bi.get("bedrooms")}
+        v = r.get("verify") or {}
+        loc = v.get("location") or info.get("location", "")
+        mode = v.get("mode") or info.get("mode", "")
+        cat = v.get("category") or info.get("category", "")
+        r["title"] = info.get("title", "") or v.get("title", "")
+        if loc and mode and cat:
+            tx = "for-rent" if mode == "rent" else "for-sale"
+            slug = LOC_SLUGS.get(loc, loc.lower().replace(" ", "-"))
+            beds = v.get("bedrooms") if "bedrooms" in v else info.get("beds")
+            beds = beds if beds in BED_OPTIONS.get(cat, ()) else None
+            r["search"] = {
+                "key": f"{beds or ''}|{loc}|{cat}|{mode}", "location": loc, "category": cat, "mode": mode,
+                "bedrooms": beds, "label": _search_label(beds, loc, cat, mode),
+                "url": v.get("url") or f"{NPC}/{tx}/{cat}/lagos/{slug}" + (f"?bedrooms={beds}" if beds else ""),
+            }
+        else:
+            r["search"] = None
+
+@app.route("/api/admin/recheck-boost", methods=["POST"])
+def api_recheck_boost():
+    err = _require_admin()
+    if err: return err
+    body = request.get_json() or {}
+    platform = body.get("platform", "npc_cw")
+    listing_id = str(body.get("listing_id", ""))
+    ref = body.get("ref", "")
+    if not listing_id:
+        return jsonify({"error": "listing_id required"}), 400
+    threading.Thread(target=_verify_boost, args=(platform, listing_id, ref, 2), daemon=True).start()
+    return jsonify({"ok": True})
+
+# ---- Auto scan scheduler: every 4 hours 9am-9pm Africa/Lagos (UTC+1) ----
+def _reco_scheduler_loop():
+    from datetime import datetime, timezone, timedelta
+    LAGOS = timezone(timedelta(hours=1))
+    last_hour_run = None
+    while True:
+        try:
+            now = datetime.now(LAGOS)
+            hour = now.hour
+            # 9,13,17,21 → four scans a day
+            if hour in (9, 13, 17, 21) and now.minute < 5:
+                key = f"{now.date()}-{hour}"
+                if key != last_hour_run and not _reco_running["flag"]:
+                    _reco_running["flag"] = True
+                    threading.Thread(target=_run_reco_sweep, daemon=True).start()
+                    last_hour_run = key
+        except Exception:
+            pass
+        time.sleep(120)  # check every 2 min
+
+if os.environ.get("CW_BACKGROUND", "1") != "0":
+    threading.Thread(target=_reco_scheduler_loop, daemon=True).start()
+
+@app.route("/api/admin/boost-log/clear", methods=["POST"])
+def api_boost_log_clear():
+    """Clear boost log entries. Body: {mode: "all"} or {mode: "selected", ids: [ts,ts,...]}
+    ids are unix ts values that uniquely identify boost log rows."""
+    err = _require_admin()
+    if err: return err
+    body = request.get_json() or {}
+    mode = body.get("mode", "selected")
+    from agents.booster_npc import _load_boosts, _save_boosts
+    if mode == "all":
+        _save_boosts([])
+        # also wipe verification metadata
+        try: open("/root/cw_listing_agent/boost_verify.json", "w").write("{}")
+        except Exception: pass
+        return jsonify({"ok": True, "cleared": "all"})
+    ids = set(body.get("ids", []) or [])
+    if not ids:
+        return jsonify({"error": "no ids provided"}), 400
+    boosts = _load_boosts()
+    kept = [b for b in boosts if b.get("ts") not in ids]
+    _save_boosts(kept)
+    # also drop matching verify entries by listing_id from removed rows
+    removed_keys = {b.get("listing_id") for b in boosts if b.get("ts") in ids}
+    try:
+        with open("/root/cw_listing_agent/boost_verify.json") as f:
+            vm = json.load(f)
+        for k in list(vm.keys()):
+            if k in removed_keys:
+                del vm[k]
+        with open("/root/cw_listing_agent/boost_verify.json", "w") as f:
+            json.dump(vm, f)
+    except Exception: pass
+    return jsonify({"ok": True, "removed": len(boosts) - len(kept)})
+
+
+@app.route("/api/admin/rank-check", methods=["POST"])
+def api_rank_check():
+    err = _require_admin()
+    if err: return err
+    body = request.get_json() or {}
+    from agents.booster_npc import check_ranking
+    try:
+        result = check_ranking(
+            body.get("location", "Ikoyi"),
+            body.get("mode", "sale"),
+            body.get("bedrooms") or None,
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+
+
+# ---- NPC photo gallery: all photos for one listing, straight from its public page ----
+_PHOTO_CACHE = {}   # (platform, lid) -> (ts, [urls])
+
+@app.route("/api/admin/npc-photos")
+def api_npc_photos():
+    """Every photo url for one NPC listing, extracted from its public page HTML."""
+    err = _require_admin()
+    if err: return err
+    lid = str(request.args.get("id", "")).strip()
+    plat = request.args.get("platform", "npc_cw")
+    if not lid.isdigit() or plat not in ("npc_cw", "npc_daniel"):
+        return jsonify({"error": "id + platform (npc_cw|npc_daniel) required"}), 400
+    hit = _PHOTO_CACHE.get((plat, lid))
+    if hit and time.time() - hit[0] < 900:
+        return jsonify({"id": lid, "photos": hit[1]})
+    public = request.args.get("public_url", "").strip()
+    from agents.poster_npc import make_session
+    sess = make_session(CREDENTIALS[plat].get("proxy_url", ""))
+    try:
+        # 1) if the caller passed the public URL, use it directly
+        # 2) otherwise ask the account's checker for a card and rebuild it
+        if not public:
+            try:
+                st = _npc_status(plat, lid)
+                slug = st.get("url_slug") or ""
+                path = st.get("path") or ""
+                mode = st.get("mode") or "sale"
+                cat  = st.get("category") or "flats-apartments"
+                if slug and path:
+                    tx = "for-rent" if mode == "rent" else "for-sale"
+                    public = f"https://nigeriapropertycentre.com/{tx}/{cat}/lagos/{path}/{lid}-{slug}"
+            except Exception:
+                pass
+        if not public:
+            return jsonify({"error": "Couldn\u2019t work out this listing\u2019s public URL"}), 502
+        r = sess.get(public, timeout=40)
+        if r.status_code != 200:
+            return jsonify({"error": f"NPC returned HTTP {r.status_code}"}), 502
+        text = r.text.replace("\\/", "/").replace("\\u0022", '"')
+        text2 = text.replace('\\/', '/').replace('\/', '/')
+        pat = re.compile(r"https://images\.nigeriapropertycentre\.com/properties/images/" + re.escape(lid)
+                         + r"/[A-Za-z0-9._-]+?\.(?:webp|jpe?g|png)")
+        urls = []
+        seen = set()
+        for src in (text, text2):
+            for m in pat.finditer(src):
+                u = m.group(0)
+                if u not in seen:
+                    seen.add(u); urls.append(u)
+        _PHOTO_CACHE[(plat, lid)] = (time.time(), urls)
+        return jsonify({"id": lid, "photos": urls, "public_url": public})
+    finally:
+        try: sess.close()
+        except Exception: pass
+
+@app.route("/api/admin/boost", methods=["POST"])
+def api_boost():
+    err = _require_admin()
+    if err: return err
+    body = request.get_json() or {}
+    listing_id = str(body.get("listing_id", "")).strip()
+    ref        = body.get("ref", "")
+    user       = body.get("user", "Admin")
+    platform   = body.get("platform", "npc_cw")
+    if not listing_id:
+        return jsonify({"error": "listing_id required"}), 400
+    if platform not in ("npc_cw", "npc_daniel"):
+        return jsonify({"error": f"Boosting only supported on NPC. '{platform}' not available."}), 400
+    from agents.booster_npc import boost_guard, boost_listing, log_boost
+    guard_key = f"{platform}:{listing_id}"
+    acct = "npc_daniel" if platform == "npc_daniel" else "npc_cw"
+    label = "NPC2" if acct == "npc_daniel" else "NPC"
+    try:
+        st = _npc_status(acct, listing_id)
+    except Exception as e:
+        return jsonify({"error": f"Couldn't reach NPC to check {ref}. Nothing was boosted; try again in a minute."}), 503
+    if not st["boostable"]:
+        return jsonify({"error": f"{ref} can't be boosted on {label}: {st['reason']}. No boost was used.",
+                        "blocked": True, "reason": st["reason"]}), 409
+    try:
+        remaining = _get_checker(acct).boost(listing_id)
+        log_boost(guard_key, ref, user, True, f"remaining={remaining}")
+        _save_boost_info(guard_key, st)
+        _schedule_verify(platform, listing_id, ref)
+        return jsonify({"ok": True, "remaining": remaining})
+    except Exception as e:
+        log_boost(guard_key, ref, user, False, str(e))
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/admin/boost-log")
+def api_boost_log():
+    err = _require_admin()
+    if err: return err
+    from agents.booster_npc import _load_boosts
+    return jsonify({"boosts": list(reversed(_load_boosts()))[:100]})
 
 
 @app.route("/start-job", methods=["POST"])
@@ -1444,7 +2531,8 @@ def start_job():
     prop       = body.get("property", {})
     platforms  = body.get("platforms", list(PLATFORM_POSTERS.keys()))
     session_id = body.get("session_id", "default")
-    posted_by  = body.get("posted_by", "")
+    posted_by      = body.get("posted_by", "")
+    platform_props = body.get("platform_props", {}) or None
 
     if not prop.get("title"):
         return jsonify({"error": "no property data — parse a description first"}), 400
@@ -1463,6 +2551,7 @@ def start_job():
     threading.Thread(
         target=run_job,
         args=(job_id, prop, platforms, raw_paths, posted_by),
+        kwargs={"platform_props": platform_props},
         daemon=True
     ).start()
 
@@ -1547,6 +2636,54 @@ def retry_platform():
         })
 
 
+
+@app.route("/retry-with-prop", methods=["POST"])
+def retry_with_prop():
+    body           = request.get_json() or {}
+    platform       = body.get("platform")
+    prop           = body.get("prop") or {}
+    platform_props = body.get("platform_props") or {}
+    session_id     = body.get("session_id") or "default"
+    posted_by      = body.get("posted_by") or ""
+
+    if not platform or platform not in PLATFORM_POSTERS:
+        return jsonify({"error": f"Unknown platform: {platform}"}), 400
+    if not prop.get("title"):
+        return jsonify({"error": "No property data in request"}), 400
+
+    # Collect images from session upload dir (still on disk after service restart)
+    img_dir = UPLOADS_DIR / session_id
+    raw_paths = []
+    if img_dir.exists():
+        raw_paths = sorted([
+            str(p) for p in img_dir.iterdir()
+            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif")
+        ])
+
+    job_id = str(uuid.uuid4())[:8]
+    JOBS[job_id] = {"events": queue.Queue(), "done": False}
+    threading.Thread(
+        target=run_job,
+        args=(job_id, prop, [platform], raw_paths, posted_by),
+        kwargs={"platform_props": platform_props or None},
+        daemon=True
+    ).start()
+
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/report-to-claude", methods=["POST"])
+def report_to_claude():
+    body     = request.get_json() or {}
+    platform = body.get("platform", "")
+    error    = body.get("error", "")
+    ref      = body.get("ref", "")
+    job_id   = "rtc_" + uuid.uuid4().hex[:8]
+    JOBS[job_id] = {"events": queue.Queue()}
+    threading.Thread(target=_run_claude_fix, args=(job_id, platform, error, ref), daemon=True).start()
+    return jsonify({"job_id": job_id})
+
+
 @app.route("/land")
 def land():
     return render_template("land.html")
@@ -1587,7 +2724,4 @@ def start_land_job():
 
 
 if __name__ == "__main__":
-    UPLOADS_DIR.mkdir(exist_ok=True)
-    port = int(os.environ.get("PORT", 5001))
-    print(f"CW Lagos Listing Portal → http://localhost:{port}")
-    app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
+    app.run(host="0.0.0.0", port=5001, debug=False)
